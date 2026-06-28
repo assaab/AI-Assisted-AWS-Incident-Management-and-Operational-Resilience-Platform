@@ -12,12 +12,14 @@ from src.agent_runtime.budgets import get_llm_budget
 from src.agent_runtime.redaction import redact_for_logging
 from src.agent_runtime.settings import get_agent_runtime_settings
 
+_tracer: Any | None = None
+
 try:
     from opentelemetry import trace
 
     _tracer = trace.get_tracer("agent_runtime.llm", "0.1.0")
 except Exception:  # pragma: no cover
-    _tracer = None
+    pass
 
 
 class StructuredLLMError(RuntimeError):

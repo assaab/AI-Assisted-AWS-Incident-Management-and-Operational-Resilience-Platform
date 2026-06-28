@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from src.adapters.actions.typed_adapters import AdapterResult
 from src.adapters.aws.clients import AwsClientFactory, classify_aws_error
@@ -121,11 +121,14 @@ class AwsEcsActionAdapter:
     def _execute(self, action: ActionRequest, cluster: str, service: str) -> dict[str, Any]:
         ecs = self._factory.client("ecs")
         if action.action_type == ActionType.RESTART_SERVICE:
-            return ecs.update_service(cluster=cluster, service=service, forceNewDeployment=True)
+            return cast(dict[str, Any], ecs.update_service(cluster=cluster, service=service, forceNewDeployment=True))
         if action.action_type == ActionType.ROLLBACK_DEPLOYMENT:
             task_definition = str(action.parameters.get("to_revision", action.parameters.get("taskDefinition", "")))
-            return ecs.update_service(cluster=cluster, service=service, taskDefinition=task_definition)
+            return cast(
+                dict[str, Any],
+                ecs.update_service(cluster=cluster, service=service, taskDefinition=task_definition),
+            )
         if action.action_type == ActionType.SCALE_WORKLOAD:
             desired = int(action.parameters.get("maxReplicas", action.parameters.get("replicas", 1)))
-            return ecs.update_service(cluster=cluster, service=service, desiredCount=desired)
+            return cast(dict[str, Any], ecs.update_service(cluster=cluster, service=service, desiredCount=desired))
         raise ValueError(f"Unsupported AWS ECS action {action.action_type.value}")

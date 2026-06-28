@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from src.config import get_app_settings
 from src.domain.contracts.models import IncidentRecord
@@ -38,7 +39,7 @@ class IncidentRepository:
             return
         if self._engine is None:
             try:
-                self._engine = create_async_engine(self._dsn, pool_pre_ping=True)
+                self._engine = create_async_engine(self._dsn, pool_pre_ping=True, poolclass=NullPool)
             except Exception:
                 if not get_app_settings().demo_mode:
                     raise

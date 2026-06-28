@@ -115,7 +115,12 @@ async def readyz() -> dict[str, object]:
             checks["checkout"] = await CheckoutServiceClient().health()
         except Exception as exc:
             checks["checkout"] = str(exc)
-    if all(value == "ok" or isinstance(value, (bool, dict)) for value in checks.values()):
+    dependency_checks = {
+        key: value
+        for key, value in checks.items()
+        if key not in {"demo_mode", "execution_mode"}
+    }
+    if all(value == "ok" or isinstance(value, dict) for value in dependency_checks.values()):
         return {"status": "ready", "checks": checks}
     if settings.demo_mode:
         return {"status": "degraded", "checks": checks}

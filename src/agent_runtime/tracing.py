@@ -3,12 +3,14 @@ from __future__ import annotations
 from contextlib import nullcontext
 from typing import Any
 
+_tracer: Any | None = None
+
 try:
     from opentelemetry import trace
 
     _tracer = trace.get_tracer("onprem_sre_agent.agents", "0.1.0")
 except Exception:  # pragma: no cover
-    _tracer = None
+    pass
 
 
 def agent_span(name: str) -> Any:

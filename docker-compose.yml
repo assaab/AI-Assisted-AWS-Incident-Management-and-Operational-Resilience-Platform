@@ -91,6 +91,8 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file: .env.demo
+    environment:
+      API_BASE_URL: http://api:8080
     command: ["python", "scripts/scenario_checkout_failure.py"]
     profiles: ["scenario"]
     depends_on:

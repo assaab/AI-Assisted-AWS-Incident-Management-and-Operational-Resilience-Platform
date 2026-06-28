@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.request
 from pathlib import Path
 from typing import Any
-import urllib.request
 
 
 def _request_json(url: str, method: str = "GET") -> dict[str, Any] | list[dict[str, Any]]:

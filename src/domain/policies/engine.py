@@ -59,7 +59,7 @@ class PolicyEngine:
         conf_min = when.get("confidenceMin")
         if conf_min is not None and planner_confidence is not None:
             try:
-                if planner_confidence < float(conf_min):
+                if planner_confidence < float(str(conf_min)):
                     return False
             except (TypeError, ValueError):
                 return False
@@ -179,7 +179,7 @@ class PolicyEngine:
         cov_min = self._approval_policy.get("minEvidenceCoverage")
         if cov_min is not None and evidence_coverage is not None:
             try:
-                if evidence_coverage < float(cov_min):
+                if evidence_coverage < float(str(cov_min)):
                     return PolicyDecision(
                         allowed=False,
                         policy_class=plan.policy_class,

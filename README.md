@@ -1,30 +1,23 @@
 # AI-Assisted AWS Incident Management and Operational Resilience Platform
 
-This project shows how an operations team can detect and recover from a failure in a critical application using one FastAPI backend and one React dashboard.
+Local demo of an AI-assisted SRE control plane for incident triage, evidence collection, root-cause analysis, approval-gated remediation, execution, verification, and reporting.
 
-The demo simulates a checkout service that starts failing after a bad deployment on-prem. The system detects the problem, checks metrics and recent changes, identifies the likely cause, recommends a safe rollback, waits for human approval, applies the fix, and confirms that the service has recovered.
+The current demo uses a checkout deployment regression. A bad release (`checkout-r43`) causes elevated checkout errors and latency, the platform investigates the incident, plans a rollback to `checkout-r42`, records approval, executes the local workload action, verifies recovery, and writes an incident report.
 
-Everything is recorded for auditing and incident reporting.
+The stack runs locally by default. AWS adapters and agentic LLM execution are present, but real cloud actions are dry-run unless explicitly configured.
 
-The demo runs locally without an AWS account or AI API key. Real cloud actions remain disabled by default for safety.
+## What Runs
 
-## Demo Scenario
+- FastAPI operations API on `http://localhost:8080`
+- React SRE console on `http://localhost:3000`
+- Local checkout workload on `http://localhost:8090`
+- Postgres with pgvector for incident state
+- Redis for hot state, idempotency, and optional worker jobs
+- Optional worker, scenario, and observability compose profiles
 
-The worked example is a checkout service that starts returning elevated errors and latency after deployment `checkout-r43`.
+## Quick Start
 
-```text
-failure injected
--> incident created
--> telemetry, logs, topology, and deployment evidence collected
--> RCA identifies the checkout-r43 deployment regression
--> rollback to checkout-r42 is planned
--> approval is recorded with token and incident version
--> local workload adapter performs the rollback
--> business metrics verify recovery
--> incident resolves and reports are written under artifacts/latest
-```
-
-## Run It
+Prerequisites: Docker, Docker Compose, Python 3.11, and `make`.
 
 ```powershell
 make demo
@@ -32,17 +25,32 @@ make verify
 make scenario-checkout-failure
 ```
 
-Open:
+Then Open:
 
 ```text
-UI:       http://localhost:3000
+Console:  http://localhost:3000
 API docs: http://localhost:8080/docs
 Health:   http://localhost:8080/readyz
 ```
 
-The console has a **Run checkout deployment failure scenario** button for the same deterministic flow.
+The console also has a `Run checkout deployment failure scenario` button. The readiness workspace is available from the console sidebar.
 
-The primary API is consolidated for a portfolio demo:
+## Main Commands
+
+```powershell
+make demo                    # start API, console, checkout workload, Postgres, and Redis
+make down                    # stop containers
+make reset                   # recreate containers and volumes
+make logs                    # follow stack logs
+make verify                  # wait for console and API readiness
+make scenario-checkout-failure
+make incident-report         # write artifacts/latest after the scenario resolves
+make e2e                     # verify stack, then run the checkout scenario
+```
+
+## API Surface
+
+Primary demo endpoints:
 
 ```text
 POST /alerts
@@ -51,37 +59,14 @@ POST /incidents/{id}/investigate
 POST /incidents/{id}/approve
 POST /incidents/{id}/execute
 GET  /incidents/{id}/audit
-```
-
-## Operational Artifacts
-
-- [Customer enablement plan](docs/customer-enablement-plan.md)
-- [Operational readiness review](docs/operational-readiness-review.md)
-- [Workload criticality assessment](docs/workload-criticality-assessment.md)
-- [RACI](docs/raci.md)
-- [Risk register](docs/risk-register.md)
-- [Incident runbook](docs/incident-runbook.md)
-- [Resilience game day](docs/resilience-game-day.md)
-- [Post-incident review](docs/post-incident-review.md)
-- [Executive status report](docs/executive-status-report.md)
-- [Well-Architected gap review](docs/well-architected-gap-review.md)
-- [Service improvement backlog](docs/service-improvement-backlog.md)
-
-## Commands
-
-```powershell
-make demo                    # app stack: API, console, checkout workload, Postgres, Redis
-make down                    # stop containers
-make reset                   # recreate containers and volumes
-make logs                    # follow stack logs
-make verify                  # wait for UI and readiness endpoints
-make scenario-checkout-failure
-make e2e
+POST /incidents/{id}/report
+GET  /readiness/workloads/checkout-service
+POST /scenario/checkout-deployment-failure
 ```
 
 ## Safety Defaults
 
-Local mode uses:
+Local demo mode uses `.env.demo`:
 
 ```text
 DEMO_MODE=true
@@ -89,6 +74,8 @@ AGENTIC_ENABLED=false
 EXECUTION_MODE=local
 EXECUTE_ACTION_DRY_RUN=true
 AUTH_MODE=demo
+AUTONOMY_KILL_SWITCH=true
+PLANNER_DEFAULT_DRY_RUN=true
 ```
 
 AWS mode is represented by `.env.aws.example` and remains dry-run by default:
@@ -100,17 +87,21 @@ EXECUTE_ACTION_DRY_RUN=true
 AUTH_MODE=oidc
 ```
 
-Production mode fails closed when dependencies are unavailable. In-memory fallback is allowed only in demo mode.
+Production mode fails closed when required dependencies are unavailable. In-memory fallback is only allowed in demo mode.
 
 ## Development Checks
 
 ```powershell
 ruff format --check .
 ruff check .
-mypy src apps
+mypy src apps eval
 pytest
 cd apps/console
 npm ci
 npm run typecheck
 npm run build
 ```
+
+## Documentation
+
+Operational readiness, runbooks, risk review, RACI, game day, executive reporting, and backlog artifacts are indexed in [docs/README.md](docs/README.md).

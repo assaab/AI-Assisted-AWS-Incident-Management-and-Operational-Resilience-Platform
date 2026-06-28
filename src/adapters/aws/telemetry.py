@@ -14,7 +14,7 @@ class AwsCloudWatchTelemetryCollectors:
 
     async def query_metrics(self, service: str, resource: str) -> str:
         settings = get_app_settings()
-        end = datetime.now(timezone.utc)
+        end = datetime.now(timezone.utc)  # noqa: UP017
         start = end - timedelta(minutes=settings.aws_deployment_lookback_minutes)
         query = {
             "Id": "checkout_error_rate",
@@ -60,7 +60,7 @@ class AwsCloudWatchTelemetryCollectors:
 
     async def query_logs(self, service: str, resource: str) -> str:
         settings = get_app_settings()
-        end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        end_ms = int(datetime.now(timezone.utc).timestamp() * 1000)  # noqa: UP017
         start_ms = end_ms - settings.aws_deployment_lookback_minutes * 60 * 1000
         if not settings.aws_log_group:
             return json.dumps(

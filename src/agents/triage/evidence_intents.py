@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 def normalize_evidence_intents(raw: Optional[List[str]]) -> List[str]:
@@ -28,7 +28,7 @@ def normalize_evidence_intents(raw: Optional[List[str]]) -> List[str]:
     return out if out else ["metrics", "logs"]
 
 
-def extract_triage_dict(hypotheses: List[dict]) -> Optional[dict]:
+def extract_triage_dict(hypotheses: List[dict[str, Any]]) -> Optional[dict[str, Any]]:
     for block in hypotheses:
         if "triage" in block and isinstance(block["triage"], dict):
             return block["triage"]

@@ -44,7 +44,7 @@ async def _process_incident(incident_id: str) -> None:
 
 async def run_forever() -> None:
     settings = get_app_settings()
-    client = redis.from_url(settings.redis_url, decode_responses=True)
+    client = redis.from_url(settings.redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
     logger.info("workflow_worker_started")
     while True:
         item = await client.blpop("incident-routing-jobs", timeout=5)

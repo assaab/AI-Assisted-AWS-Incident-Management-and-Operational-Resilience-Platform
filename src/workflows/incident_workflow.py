@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from apps.api.routers.audit.store import audit_store
 from apps.api.routers.incident_store.repository import repository
@@ -31,8 +31,8 @@ def _max_iterations() -> int:
     return max(1, int(os.getenv("ROUTER_MAX_ITERATIONS", "12")))
 
 
-def _append_trace(incident: IncidentRecord, phase: str, message: str, **kwargs: object) -> None:
-    entry = ExecutionTraceEntry(phase=phase, message=message, **kwargs)
+def _append_trace(incident: IncidentRecord, phase: str, message: str) -> None:
+    entry = ExecutionTraceEntry(phase=phase, message=message)
     incident.execution_trace.entries.append(entry)
 
 
@@ -65,10 +65,10 @@ async def _persist_decision(
 
 async def run_linear_route(
     incident: IncidentRecord,
-    triage_fn: Callable[[IncidentRecord], Awaitable[dict]],
+    triage_fn: Callable[[IncidentRecord], Awaitable[dict[str, Any]]],
     evidence_fn: Callable[[IncidentRecord], Awaitable[list[EvidenceEntry]]],
     change_fn: Callable[[IncidentRecord], Awaitable[EvidenceEntry]],
-    rca_fn: Callable[[IncidentRecord], Awaitable[list[dict]]],
+    rca_fn: Callable[[IncidentRecord], Awaitable[list[dict[str, Any]]]],
     write_checkpoint: Callable[[IncidentRecord, str], Awaitable[None]],
 ) -> IncidentRecord:
     """Legacy fixed order: triage -> evidence -> change -> RCA."""
@@ -100,10 +100,10 @@ async def run_linear_route(
 
 async def run_decision_loop_route(
     incident: IncidentRecord,
-    triage_fn: Callable[[IncidentRecord], Awaitable[dict]],
+    triage_fn: Callable[[IncidentRecord], Awaitable[dict[str, Any]]],
     evidence_fn: Callable[[IncidentRecord], Awaitable[list[EvidenceEntry]]],
     change_fn: Callable[[IncidentRecord], Awaitable[EvidenceEntry]],
-    rca_fn: Callable[[IncidentRecord], Awaitable[list[dict]]],
+    rca_fn: Callable[[IncidentRecord], Awaitable[list[dict[str, Any]]]],
     write_checkpoint: Callable[[IncidentRecord, str], Awaitable[None]],
 ) -> IncidentRecord:
     """Control loop: observe -> router decision -> single step -> repeat."""
@@ -204,10 +204,10 @@ async def run_decision_loop_route(
 
 async def execute_route(
     incident: IncidentRecord,
-    triage_fn: Callable[[IncidentRecord], Awaitable[dict]],
+    triage_fn: Callable[[IncidentRecord], Awaitable[dict[str, Any]]],
     evidence_fn: Callable[[IncidentRecord], Awaitable[list[EvidenceEntry]]],
     change_fn: Callable[[IncidentRecord], Awaitable[EvidenceEntry]],
-    rca_fn: Callable[[IncidentRecord], Awaitable[list[dict]]],
+    rca_fn: Callable[[IncidentRecord], Awaitable[list[dict[str, Any]]]],
     write_checkpoint: Callable[[IncidentRecord, str], Awaitable[None]],
 ) -> IncidentRecord:
     with llm_budget_context():
