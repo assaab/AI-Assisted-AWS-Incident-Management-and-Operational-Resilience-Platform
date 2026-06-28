@@ -19,6 +19,14 @@ class AppSettings(BaseSettings):
         alias="POSTGRES_DSN",
     )
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    aws_region: str = Field(default="us-east-1", alias="AWS_REGION")
+    aws_profile: str = Field(default="", alias="AWS_PROFILE")
+    aws_ecs_cluster: str = Field(default="", alias="AWS_ECS_CLUSTER")
+    aws_ecs_service: str = Field(default="", alias="AWS_ECS_SERVICE")
+    aws_log_group: str = Field(default="", alias="AWS_LOG_GROUP")
+    aws_metric_namespace: str = Field(default="AWS/ECS", alias="AWS_METRIC_NAMESPACE")
+    aws_deployment_lookback_minutes: int = Field(default=60, alias="AWS_DEPLOYMENT_LOOKBACK_MINUTES")
+    aws_action_dry_run: bool = Field(default=True, alias="AWS_ACTION_DRY_RUN")
 
 
 @lru_cache

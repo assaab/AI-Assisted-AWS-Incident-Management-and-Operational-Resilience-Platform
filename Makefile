@@ -1,7 +1,7 @@
 PYTHON ?= python
 COMPOSE ?= docker compose
 
-.PHONY: lint test typecheck replay demo down reset logs verify scenario-checkout-failure e2e
+.PHONY: lint test typecheck replay demo down reset logs verify scenario-checkout-failure incident-report e2e
 
 lint:
 	ruff check .
@@ -33,5 +33,8 @@ verify:
 
 scenario-checkout-failure:
 	$(COMPOSE) run --rm scenario
+
+incident-report:
+	$(PYTHON) scripts/incident_report.py
 
 e2e: verify scenario-checkout-failure

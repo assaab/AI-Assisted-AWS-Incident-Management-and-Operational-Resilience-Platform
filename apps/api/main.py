@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from uuid import uuid4
 
 import redis.asyncio as redis
@@ -17,6 +16,8 @@ from apps.api.routers.incident_store.app import app as incident_store_app
 from apps.api.routers.incident_store.repository import repository
 from apps.api.routers.ingress.app import app as ingress_app
 from apps.api.routers.ingress.normalizer import normalize
+from apps.api.routers.readiness.app import app as readiness_app
+from apps.api.routers.reporting.app import app as reporting_app
 from apps.api.routers.router.app import app as router_app
 from src.adapters.local.checkout_client import CheckoutServiceClient
 from src.agents.change_correlation.agent import ChangeCorrelationAgent
@@ -28,6 +29,7 @@ from src.agents.triage.agent import TriageAgent
 from src.config import get_app_settings
 from src.domain.contracts.models import ApprovalRecord, ExecutionTraceEntry, IncidentRecord, IncidentState
 from src.observability import instrument_fastapi
+from src.reporting.incident_reports import generate_incident_report, write_incident_report
 from src.workflows.incident_workflow import execute_route
 
 app = FastAPI(
@@ -43,7 +45,7 @@ app.add_middleware(
 )
 instrument_fastapi(app)
 
-for sub_app in (ingress_app, incident_store_app, router_app, approval_app, audit_app):
+for sub_app in (ingress_app, incident_store_app, router_app, approval_app, audit_app, readiness_app, reporting_app):
     app.include_router(sub_app.router)
 
 
@@ -88,30 +90,6 @@ async def _write_checkpoint(incident: IncidentRecord, step: str) -> None:
         incident.agent_path.append(step)
     await repository.upsert(incident)
     await audit_store.append("workflow_checkpoint", {"incident_id": incident.incident_id, "step": step})
-
-
-def _write_reports(incident: IncidentRecord) -> None:
-    artifact_dir = Path("artifacts/latest")
-    artifact_dir.mkdir(parents=True, exist_ok=True)
-    summary = (
-        "# Executive Summary\n\n"
-        f"Incident `{incident.incident_id}` for checkout-service recovered through an approved rollback.\n\n"
-        f"* State: {incident.state.value}\n"
-        f"* Diagnosis: {incident.final_diagnosis or 'Deployment regression in checkout-r43'}\n"
-        f"* Resolution: {incident.final_resolution or 'Rollback verified by business metrics'}\n"
-    )
-    review = (
-        "# Post-Incident Review\n\n"
-        "## Customer Impact\n\nCheckout errors and latency increased after deployment checkout-r43.\n\n"
-        "## Root Cause\n\nA deployment regression caused elevated payment timeouts and checkout latency.\n\n"
-        "## Recovery\n\n"
-        "The approved rollback restored checkout-r42 and verification confirmed healthy business metrics.\n\n"
-        "## Follow-Up Actions\n\n"
-        "* Add a canary gate for checkout deployments.\n"
-        "* Keep rollback approval paths tested during game days.\n"
-    )
-    (artifact_dir / "executive-summary.md").write_text(summary, encoding="utf-8")
-    (artifact_dir / "post-incident-review.md").write_text(review, encoding="utf-8")
 
 
 @app.post("/scenario/checkout-deployment-failure")
@@ -185,7 +163,7 @@ async def run_checkout_deployment_failure() -> dict[str, object]:
         "scenario_completed",
         {"incident_id": routed.incident_id, "success": result.success and verified, "metrics": metrics},
     )
-    _write_reports(routed)
+    write_incident_report(generate_incident_report(routed, await audit_store.list_events(limit=1000)))
     return {
         "incident": routed.model_dump(mode="json"),
         "approval": approval.model_dump(mode="json"),

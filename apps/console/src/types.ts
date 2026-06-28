@@ -161,3 +161,26 @@ export type ExecuteResponse = {
   policy: Record<string, unknown>;
   result: ActionResult & Record<string, unknown>;
 };
+
+export type ReadinessWorkspace = {
+  workload: string;
+  criticality: string;
+  availability_target: string;
+  rto: string;
+  rpo: string;
+  slo_summary: Record<string, unknown>;
+  observability_readiness: Record<string, unknown>;
+  runbook_coverage: Record<string, unknown>;
+  open_risks: Array<Record<string, unknown>>;
+  resilience_test_status: Record<string, unknown>;
+  problem_management_actions: string[];
+  enablement_progress: Array<Record<string, unknown>>;
+};
+
+export type IncidentReport = {
+  incident_id: string;
+  executive_summary: string;
+  post_incident_review: string;
+  incident_timeline: Array<Record<string, unknown>>;
+  metrics: Record<string, unknown>;
+};

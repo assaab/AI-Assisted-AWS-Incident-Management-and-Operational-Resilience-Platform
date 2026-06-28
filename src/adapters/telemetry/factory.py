@@ -18,6 +18,10 @@ class TelemetryCollectorsProtocol(Protocol):
 
 def get_telemetry_collectors() -> TelemetryCollectorsProtocol:
     s = get_agent_runtime_settings()
+    if s.telemetry_adapter == "aws":
+        from src.adapters.aws.telemetry import AwsCloudWatchTelemetryCollectors
+
+        return AwsCloudWatchTelemetryCollectors()
     if s.telemetry_adapter == "local":
         return LocalCheckoutTelemetryCollectors()
     if s.telemetry_adapter == "stub":

@@ -2,12 +2,13 @@ import { CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   executeIncidentAction,
   fetchIncident,
+  generateIncidentReport,
   planIncident,
   routeIncident,
   submitApproval
 } from "../api";
 import { formatDateTime, formatRelativeTime, humanizeSeverity, humanizeState } from "../format";
-import { ActionRequest, AuditEvent, ExecuteResponse, IncidentRecord, ReplayScore } from "../types";
+import { ActionRequest, AuditEvent, ExecuteResponse, IncidentRecord, IncidentReport, ReplayScore } from "../types";
 
 function pickPendingAction(inc: IncidentRecord): ActionRequest | null {
   const g = inc.pending_action_graph;
@@ -130,6 +131,9 @@ export function IncidentWorkspace(props: Props): JSX.Element {
   const [executing, setExecuting] = useState(false);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executeResult, setExecuteResult] = useState<ExecuteResponse | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [report, setReport] = useState<IncidentReport | null>(null);
 
   const sorted = useMemo(() => {
     return [...incidents].sort((a, b) => {
@@ -168,6 +172,8 @@ export function IncidentWorkspace(props: Props): JSX.Element {
     setExecuteResult(null);
     setExecuteError(null);
     setApproveError(null);
+    setReport(null);
+    setReportError(null);
   }, [selectedId]);
 
   const selected = useMemo(
@@ -403,6 +409,40 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                     )}
                   </dl>
                 </div>
+
+                <section style={{ marginBottom: 20 }}>
+                  <h3 style={sectionTitle}>Operational report</h3>
+                  <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 8px" }}>
+                    Generates the incident timeline, executive summary, recovery proof, and post-incident review from
+                    the current audit trail.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    disabled={reporting}
+                    onClick={() => {
+                      setReportError(null);
+                      setReporting(true);
+                      void generateIncidentReport(selected.incident_id)
+                        .then((next) => setReport(next))
+                        .catch((e: Error) => setReportError(e.message))
+                        .finally(() => setReporting(false));
+                    }}
+                  >
+                    {reporting ? "Generating..." : "Generate incident report"}
+                  </button>
+                  {reportError && (
+                    <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--danger)" }} role="alert">
+                      {reportError}
+                    </p>
+                  )}
+                  {report && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Executive summary</div>
+                      <pre className="pre-json">{report.executive_summary}</pre>
+                    </div>
+                  )}
+                </section>
 
                 {selected.state === "waiting_approval" && (
                   <section className="inspector-approval-prompt" aria-label="Human approval">

@@ -22,6 +22,10 @@ class StubChangeFeedClient:
 
 def get_change_feed_client() -> ChangeFeedProtocol:
     s = get_agent_runtime_settings()
+    if s.change_feed_adapter == "aws":
+        from src.adapters.aws.change_feed import AwsEcsChangeFeedClient
+
+        return AwsEcsChangeFeedClient()
     if s.change_feed_adapter == "stub":
         return StubChangeFeedClient()
     return StubChangeFeedClient()

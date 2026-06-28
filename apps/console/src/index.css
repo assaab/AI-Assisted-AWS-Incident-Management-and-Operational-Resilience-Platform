@@ -756,3 +756,94 @@ button {
   border: 1px solid var(--border);
   color: var(--text-secondary);
 }
+
+.readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.readiness-card {
+  min-height: 0;
+}
+
+.readiness-card--wide {
+  grid-column: 1 / -1;
+}
+
+.readiness-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.readiness-kpis div {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  padding: 14px;
+}
+
+.readiness-kpis span,
+.readiness-dl dt {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.readiness-kpis strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.readiness-dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.readiness-dl dd {
+  margin: 3px 0 0;
+  color: var(--text);
+}
+
+.readiness-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.readiness-list--columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.readiness-list li {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  padding: 12px;
+}
+
+.readiness-list strong,
+.readiness-list span {
+  display: block;
+}
+
+.readiness-list span {
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 820px) {
+  .readiness-grid,
+  .readiness-kpis,
+  .readiness-list--columns {
+    grid-template-columns: 1fr;
+  }
+}

@@ -56,7 +56,9 @@ class TypedActionAdapterRegistry:
             "mode": settings.execution_mode,
             "dry_run_default": settings.execute_action_dry_run,
             "supported_actions": sorted(action.value for action in self.supported_actions),
-            "executable_actions": sorted(action.value for action in executable if settings.execution_mode == "local"),
+            "executable_actions": sorted(
+                action.value for action in executable if settings.execution_mode in {"local", "aws"}
+            ),
         }
 
     def _validate_parameters(self, action: ActionRequest) -> None:
@@ -76,9 +78,18 @@ class TypedActionAdapterRegistry:
             self._validate_parameters(action)
         except ValidationError as exc:
             return AdapterResult(False, "Action parameters failed validation", {"errors": exc.errors()})
+        settings = get_app_settings()
+        if settings.execution_mode == "aws":
+            from src.adapters.aws.actions import AwsEcsActionAdapter
+
+            if action.action_type in {
+                ActionType.RESTART_SERVICE,
+                ActionType.SCALE_WORKLOAD,
+                ActionType.ROLLBACK_DEPLOYMENT,
+            }:
+                return await AwsEcsActionAdapter().run(action)
         if action.dry_run:
             return AdapterResult(True, f"Dry-run completed for {action.action_type.value}", {"dry_run": True})
-        settings = get_app_settings()
         if settings.execution_mode != "local":
             return AdapterResult(
                 False,

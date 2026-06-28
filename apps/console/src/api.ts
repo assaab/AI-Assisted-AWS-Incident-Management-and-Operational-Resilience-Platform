@@ -1,4 +1,13 @@
-import { ActionRequest, AuditEvent, DashboardLoad, ExecuteResponse, IncidentRecord, ReplayScore } from "./types";
+import {
+  ActionRequest,
+  AuditEvent,
+  DashboardLoad,
+  ExecuteResponse,
+  IncidentRecord,
+  IncidentReport,
+  ReadinessWorkspace,
+  ReplayScore
+} from "./types";
 
 /**
  * In dev, prefer same-origin `/api/*` proxies (see vite.config.ts) so requests are not blocked by CORS
@@ -30,6 +39,11 @@ const approvalBase = baseFromEnvOrDevProxy(
 const scenarioBase = baseFromEnvOrDevProxy(
   import.meta.env.VITE_SCENARIO_URL,
   "/api/scenario",
+  "http://localhost:8080"
+);
+const readinessBase = baseFromEnvOrDevProxy(
+  import.meta.env.VITE_READINESS_URL,
+  "/api/readiness",
   "http://localhost:8080"
 );
 
@@ -209,4 +223,25 @@ export async function runCheckoutDeploymentFailureScenario(): Promise<IncidentRe
   }
   const data = (await r.json()) as { incident: IncidentRecord };
   return data.incident;
+}
+
+export async function fetchReadinessWorkspace(): Promise<ReadinessWorkspace> {
+  const r = await fetch(`${readinessBase}/readiness/workloads/checkout-service`);
+  if (!r.ok) {
+    const detail = await r.text();
+    throw new Error(`Readiness workspace failed (${r.status}): ${detail}`);
+  }
+  return (await r.json()) as ReadinessWorkspace;
+}
+
+export async function generateIncidentReport(incidentId: string): Promise<IncidentReport> {
+  const r = await fetch(`${incidentStoreBase}/incidents/${encodeURIComponent(incidentId)}/report`, {
+    method: "POST",
+    headers: jsonHeaders
+  });
+  if (!r.ok) {
+    const detail = await r.text();
+    throw new Error(`Report generation failed (${r.status}): ${detail}`);
+  }
+  return (await r.json()) as IncidentReport;
 }

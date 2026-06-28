@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { loadDashboard, runCheckoutDeploymentFailureScenario } from "./api";
+import { fetchReadinessWorkspace, loadDashboard, runCheckoutDeploymentFailureScenario } from "./api";
 import { IncidentWorkspace } from "./components/IncidentWorkspace";
+import { ReadinessWorkspace } from "./components/ReadinessWorkspace";
 import "./index.css";
-import { DashboardLoad, IncidentRecord } from "./types";
+import { DashboardLoad, IncidentRecord, ReadinessWorkspace as ReadinessWorkspaceType } from "./types";
 
 function IconIncidents(): JSX.Element {
   return (
@@ -82,6 +83,7 @@ function computeIncidentStats(incidents: IncidentRecord[]): {
 }
 
 export function App(): JSX.Element {
+  const [workspace, setWorkspace] = useState<"incidents" | "readiness">("incidents");
   const [data, setData] = useState<DashboardLoad>({
     incidents: [],
     auditEvents: [],
@@ -90,16 +92,27 @@ export function App(): JSX.Element {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessWorkspaceType | null>(null);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
   const [scenarioRunning, setScenarioRunning] = useState(false);
 
   const refresh = useCallback(async (): Promise<void> => {
     setError(null);
+    setReadinessError(null);
     setLoading(true);
     try {
-      const next = await loadDashboard();
-      setData(next);
-      if (next.loadErrors.length > 0) {
-        setError(next.loadErrors.join(" "));
+      const [next, readinessNext] = await Promise.allSettled([loadDashboard(), fetchReadinessWorkspace()]);
+      if (next.status !== "fulfilled") {
+        throw next.reason;
+      }
+      if (readinessNext.status === "fulfilled") {
+        setReadiness(readinessNext.value);
+      } else {
+        setReadinessError("Failed to load readiness workspace.");
+      }
+      setData(next.value);
+      if (next.value.loadErrors.length > 0) {
+        setError(next.value.loadErrors.join(" "));
       }
     } catch {
       setError("Failed to load dashboard data.");
@@ -129,9 +142,23 @@ export function App(): JSX.Element {
           </div>
         </div>
         <nav className="sidebar__nav">
-          <button type="button" className="sidebar__link sidebar__link--active" aria-current="page">
+          <button
+            type="button"
+            className={`sidebar__link ${workspace === "incidents" ? "sidebar__link--active" : ""}`}
+            aria-current={workspace === "incidents" ? "page" : undefined}
+            onClick={() => setWorkspace("incidents")}
+          >
             <IconIncidents />
             Incidents
+          </button>
+          <button
+            type="button"
+            className={`sidebar__link ${workspace === "readiness" ? "sidebar__link--active" : ""}`}
+            aria-current={workspace === "readiness" ? "page" : undefined}
+            onClick={() => setWorkspace("readiness")}
+          >
+            <IconMetricApproval />
+            Readiness
           </button>
         </nav>
         <div className="sidebar__footer">
@@ -149,12 +176,17 @@ export function App(): JSX.Element {
         <header className="topbar">
           <div>
             <p className="breadcrumb">Dashboard / Incidents</p>
-            <h1 className="topbar__title">Incident monitoring</h1>
+            <h1 className="topbar__title">
+              {workspace === "incidents" ? "Incident monitoring" : "Operational readiness"}
+            </h1>
             <p className="topbar__desc">
-              Track routing, workflow steps, evidence, and audit in one place. Data syncs every 10 seconds.
+              {workspace === "incidents"
+                ? "Track routing, workflow steps, evidence, and audit in one place. Data syncs every 10 seconds."
+                : "Review checkout workload criticality, SLOs, runbook coverage, risks, and enablement progress."}
             </p>
           </div>
-          <div className="topbar__actions">
+          {workspace === "incidents" && (
+            <div className="topbar__actions">
             {loading && (
               <span
                 style={{
@@ -189,9 +221,11 @@ export function App(): JSX.Element {
               {scenarioRunning ? "Running scenario..." : "Run checkout deployment failure scenario"}
             </button>
           </div>
+          )}
         </header>
 
-        <section className="metric-strip" aria-label="Incident summary">
+        {workspace === "incidents" && (
+          <section className="metric-strip" aria-label="Incident summary">
           <div className="metric-card">
             <div className="metric-card__icon metric-card__icon--total" aria-hidden="true">
               <IconMetricTotal />
@@ -232,7 +266,8 @@ export function App(): JSX.Element {
               <p className="metric-card__hint">Needs human sign-off</p>
             </div>
           </div>
-        </section>
+          </section>
+        )}
 
         {error && (
           <div className="alert-banner" role="alert">
@@ -241,15 +276,26 @@ export function App(): JSX.Element {
         )}
 
         <div className="app-main__body">
-          <IncidentWorkspace
-            incidents={data.incidents}
-            auditEvents={data.auditEvents}
-            score={data.score}
-            loading={loading}
-            onRefresh={() => {
-              void refresh();
-            }}
-          />
+          {workspace === "incidents" ? (
+            <IncidentWorkspace
+              incidents={data.incidents}
+              auditEvents={data.auditEvents}
+              score={data.score}
+              loading={loading}
+              onRefresh={() => {
+                void refresh();
+              }}
+            />
+          ) : (
+            <ReadinessWorkspace
+              data={readiness}
+              loading={loading}
+              error={readinessError}
+              onRefresh={() => {
+                void refresh();
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
