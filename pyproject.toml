@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "onprem-sre-agent"
 version = "0.1.0"
 description = "Self-hosted incident response control plane for on-prem and hybrid estates."
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.116.0",
   "uvicorn[standard]>=0.35.0",
@@ -37,11 +37,11 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["libs*", "services*", "agents*", "adapters*", "eval*"]
+include = ["src*", "apps*", "eval*"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "ASYNC"]

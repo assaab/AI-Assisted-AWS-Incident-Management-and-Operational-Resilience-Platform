@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from libs.agent_runtime.llm import clear_llm_client_cache
-from libs.agent_runtime.settings import clear_agent_runtime_settings_cache
+from src.agent_runtime.llm import clear_llm_client_cache
+from src.agent_runtime.settings import clear_agent_runtime_settings_cache
 
 
 @pytest.fixture(autouse=True)

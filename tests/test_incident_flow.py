@@ -4,9 +4,9 @@ import asyncio
 
 from httpx import ASGITransport, AsyncClient
 
-from services.approval_api.app import app as approval_app
-from services.ingress.app import app as ingress_app
-from services.router.app import app as router_app
+from apps.api.routers.approval_api.app import app as approval_app
+from apps.api.routers.ingress.app import app as ingress_app
+from apps.api.routers.router.app import app as router_app
 
 
 def test_ingest_route_plan_approve_execute_flow() -> None:

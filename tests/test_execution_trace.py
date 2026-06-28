@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from libs.contracts.models import (
+from src.domain.contracts.models import (
     ActionResult,
     ExecutionTraceEntry,
     IncidentEnvelope,

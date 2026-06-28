@@ -13,11 +13,11 @@ from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from libs.agent_runtime.llm import OpenAICompatibleClient, clear_llm_client_cache
-from libs.agent_runtime.settings import clear_agent_runtime_settings_cache, get_agent_runtime_settings
-from services.approval_api.app import app as approval_app
-from services.ingress.app import app as ingress_app
-from services.router.app import app as router_app
+from src.agent_runtime.llm import OpenAICompatibleClient, clear_llm_client_cache
+from src.agent_runtime.settings import clear_agent_runtime_settings_cache, get_agent_runtime_settings
+from apps.api.routers.approval_api.app import app as approval_app
+from apps.api.routers.ingress.app import app as ingress_app
+from apps.api.routers.router.app import app as router_app
 from tests.conftest import load_dotenv_into_os_environ
 
 

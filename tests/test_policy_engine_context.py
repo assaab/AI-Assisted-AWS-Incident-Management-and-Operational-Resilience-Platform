@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from libs.contracts.models import (
+from src.domain.contracts.models import (
     ActionRequest,
     ActionType,
     IncidentEnvelope,
@@ -10,7 +10,7 @@ from libs.contracts.models import (
     PolicyClass,
     ResponsePlan,
 )
-from libs.policy.engine import PolicyEngine
+from src.domain.policies.engine import PolicyEngine
 
 
 def _base_plan() -> ResponsePlan:
@@ -87,8 +87,8 @@ def test_high_risk_rule_always_requires_approval() -> None:
 def test_investigate_only_execute_blocked_when_flag_set(monkeypatch) -> None:
     from httpx import ASGITransport, AsyncClient
 
-    from libs.contracts.models import IncidentState, RouterDecision
-    from services.router.app import app as router_app
+    from src.domain.contracts.models import IncidentState, RouterDecision
+    from apps.api.routers.router.app import app as router_app
 
     monkeypatch.setenv("BLOCK_EXECUTE_WHEN_INVESTIGATE_ONLY", "true")
 
@@ -118,8 +118,8 @@ def test_investigate_only_execute_blocked_when_flag_set(monkeypatch) -> None:
     async def _upsert(_):
         return incident
 
-    monkeypatch.setattr("services.router.app.repository.get", _get)
-    monkeypatch.setattr("services.router.app.repository.upsert", _upsert)
+    monkeypatch.setattr("apps.api.routers.router.app.repository.get", _get)
+    monkeypatch.setattr("apps.api.routers.router.app.repository.upsert", _upsert)
 
     async def run():
         transport = ASGITransport(app=router_app)

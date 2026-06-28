@@ -1,5 +1,5 @@
-from libs.contracts.models import ActionType
-from services.router.response_plans import match_response_plan
+from src.domain.contracts.models import ActionType
+from src.workflows.response_plans import match_response_plan
 
 
 def test_matches_compute_performance_route() -> None:

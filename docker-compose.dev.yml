@@ -30,7 +30,7 @@ services:
     container_name: onprem-sre-otel
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
-      - ./k8s/dev/otel-config.yaml:/etc/otelcol/config.yaml:ro
+      - ./infra/local/k8s/dev/otel-config.yaml:/etc/otelcol/config.yaml:ro
     ports:
       - "4317:4317"
       - "4318:4318"

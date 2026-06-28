@@ -14,12 +14,12 @@ $env:REDIS_URL = "redis://localhost:6379/0"
 $env:CORS_ALLOW_ORIGINS = "http://localhost:5173,http://localhost:5175"
 
 $services = @(
-    @{ Module = "services.ingress.app:app"; Port = 8001 },
-    @{ Module = "services.incident_store.app:app"; Port = 8002 },
-    @{ Module = "services.router.app:app"; Port = 8003 },
-    @{ Module = "services.policy_engine.app:app"; Port = 8004 },
-    @{ Module = "services.approval_api.app:app"; Port = 8005 },
-    @{ Module = "services.audit.app:app"; Port = 8006 }
+    @{ Module = "apps.api.routers.ingress.app:app"; Port = 8001 },
+    @{ Module = "apps.api.routers.incident_store.app:app"; Port = 8002 },
+    @{ Module = "apps.api.routers.router.app:app"; Port = 8003 },
+    @{ Module = "apps.api.routers.policy_engine.app:app"; Port = 8004 },
+    @{ Module = "apps.api.routers.approval_api.app:app"; Port = 8005 },
+    @{ Module = "apps.api.routers.audit.app:app"; Port = 8006 }
 )
 
 foreach ($s in $services) {

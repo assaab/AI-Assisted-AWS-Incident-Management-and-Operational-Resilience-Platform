@@ -9,7 +9,7 @@ test:
 	pytest
 
 typecheck:
-	mypy libs services agents adapters eval
+	mypy src apps eval
 
 replay:
 	$(PYTHON) eval/replay/replay_runner.py

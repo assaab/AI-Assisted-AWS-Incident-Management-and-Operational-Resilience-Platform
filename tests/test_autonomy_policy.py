@@ -1,9 +1,9 @@
 import asyncio
 from datetime import datetime
 
-from agents.planner.agent import RemediationPlannerAgent
-from libs.contracts.models import IncidentEnvelope, IncidentRecord
-from services.policy_engine.autonomy import qualifies_for_autonomy
+from src.agents.planner.agent import RemediationPlannerAgent
+from src.domain.contracts.models import IncidentEnvelope, IncidentRecord
+from apps.api.routers.policy_engine.autonomy import qualifies_for_autonomy
 
 
 async def _build_action_graph():

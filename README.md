@@ -1,148 +1,73 @@
 # AI-Assisted AWS Incident Management and Operational Resilience Platform
 
-An incident-management and operational-resilience lab for demonstrating how critical workloads can be monitored, triaged, routed, governed, approved, executed, and audited.
+## What Is This Project?
 
-The project combines FastAPI services, policy controls, incident state management, audit history, OpenTelemetry hooks, and a React operator console. It is currently optimized for local development and portfolio evaluation, with stubbed adapters for telemetry and execution.
+This project is a local incident-management platform that shows how an operations team can detect service errors, investigate the cause, plan a safe remediation, request approval, execute or dry-run the fix, verify recovery, and keep an audit trail.
 
-## What This Project Does
+It is designed to demonstrate operational resilience, incident coordination, policy-controlled automation, and agentic troubleshooting for business-critical workloads.
 
-- Ingests alerts and normalizes them into incident records.
-- Routes incidents through triage, evidence collection, change correlation, RCA, and response planning.
-- Applies policy and approval controls before remediation actions.
-- Tracks incident state, workflow checkpoints, execution traces, approvals, and audit events.
-- Provides a browser console for operators to inspect incidents, plans, approvals, replay scores, and audit history.
-- Supports optional LLM-assisted routing through server-side configuration.
+## Simple Example
 
-## Architecture
+Imagine a checkout service starts failing after a deployment.
 
-```mermaid
-flowchart LR
-    UI[React Console] --> IncidentStore[Incident Store API]
-    UI --> Router[Router API]
-    UI --> Approval[Approval API]
-    UI --> Audit[Audit API]
-
-    Ingress[Ingress API] --> IncidentStore
-    Router --> Agents[Triage, Evidence, Change, RCA, Planner, Executor]
-    Router --> Policy[Policy Engine]
-    Router --> Audit
-    Approval --> IncidentStore
-    Approval --> Audit
-
-    IncidentStore --> Postgres[(PostgreSQL)]
-    Router --> Redis[(Redis)]
-    Ingress --> Redis
-    Audit --> Postgres
-    Services[FastAPI Services] --> OTEL[OpenTelemetry Collector]
-```
-
-## Recommended Folder Structure
-
-The target project structure follows the redesign recommended in `files/ExecutiveAssessment.md`. Existing modules should be migrated into this layout gradually.
+The platform flow is:
 
 ```text
-/
-├── apps/
-│   ├── api/
-│   │   ├── main.py
-│   │   ├── routers/
-│   │   └── dependencies/
-│   ├── worker/
-│   │   ├── main.py
-│   │   └── jobs/
-│   └── console/
-│       └── React application
-├── src/
-│   ├── domain/
-│   │   ├── incidents/
-│   │   ├── actions/
-│   │   ├── approvals/
-│   │   └── policies/
-│   ├── workflows/
-│   ├── agents/
-│   ├── ports/
-│   │   ├── telemetry.py
-│   │   ├── changes.py
-│   │   ├── actions.py
-│   │   └── notifications.py
-│   ├── adapters/
-│   │   ├── local/
-│   │   ├── aws/
-│   │   └── llm/
-│   ├── persistence/
-│   ├── observability/
-│   └── security/
-├── scenarios/
-│   └── checkout-deployment-regression/
-├── sample-workload/
-│   └── checkout-service/
-├── policies/
-│   ├── demo/
-│   └── production/
-├── migrations/
-├── tests/
-│   ├── unit/
-│   ├── contract/
-│   ├── integration/
-│   ├── e2e/
-│   └── resilience/
-├── infra/
-│   ├── local/
-│   └── aws/
-├── docs/
-├── docker-compose.yml
-├── Makefile
-└── README.md
+Alert or error detected
+-> incident created
+-> triage agent evaluates severity and context
+-> evidence agent gathers telemetry and change data
+-> RCA and change-correlation agents identify the likely cause
+-> planner agent proposes remediation
+-> policy engine checks safety and approval requirements
+-> human approval is requested when needed
+-> executor runs or dry-runs the remediation
+-> verification confirms recovery
+-> audit and reporting record the outcome
 ```
 
-Current code still lives in the original `services/`, `agents/`, `libs/`, `adapters/`, and `ui/console/` folders. The README uses the recommended structure as the intended end state, not as a claim that every module has already been moved.
+In simple terms: the system helps move from **problem detected** to **safe recovery action** with governance and evidence.
 
-## Prerequisites
+## What Will Be the Result?
 
-- Python 3.11 recommended
-- Node.js 18 or newer
-- Docker Desktop
-- Git
-- PowerShell on Windows
+After running the project, you can see:
 
-An OpenAI or other LLM-compatible API key is optional. The platform can run with stub fallback behavior for local evaluation.
+- Incidents created from alerts.
+- Agent-driven triage, evidence gathering, RCA, and planning.
+- Policy decisions that block or require approval for risky actions.
+- Approval records for controlled remediation.
+- Execution or dry-run results.
+- Audit history showing what happened and why.
+- A React console for reviewing incidents and operational status.
 
-## Quick Start
+## How to Run It
 
-From the repository root:
+### 1. Install backend dependencies
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -e ".[dev]"
-```
-
-Copy the backend environment template:
-
-```powershell
 Copy-Item .env.example .env
 ```
 
-Start infrastructure dependencies:
+### 2. Start local infrastructure
 
 ```powershell
 docker compose -f docker-compose.dev.yml up -d
-```
-
-Run database migrations:
-
-```powershell
 alembic upgrade head
 ```
 
-Start the backend services:
+### 3. Start backend services
 
 ```powershell
 .\tests\start-backend-services.ps1
 ```
 
-Start the console:
+This starts the local APIs on ports `8001` to `8006`.
+
+### 4. Start the web console
 
 ```powershell
 cd ui\console
@@ -150,125 +75,50 @@ npm install
 npm run dev
 ```
 
-Open the console:
+Open:
 
 ```text
 http://localhost:5173
 ```
 
-## Local Service Ports
+## Quick Check
 
-| Service | Port | Health check |
-| --- | ---: | --- |
-| Ingress API | 8001 | `http://127.0.0.1:8001/healthz` |
-| Incident Store API | 8002 | `http://127.0.0.1:8002/healthz` |
-| Router API | 8003 | `http://127.0.0.1:8003/healthz` |
-| Policy Engine API | 8004 | `http://127.0.0.1:8004/healthz` |
-| Approval API | 8005 | `http://127.0.0.1:8005/healthz` |
-| Audit API | 8006 | `http://127.0.0.1:8006/healthz` |
-| Console | 5173 | `http://localhost:5173` |
-
-## Try a Smoke Test
-
-After Docker, migrations, backend services, and the console are running:
+Run this after the services are started:
 
 ```powershell
 .\tests\smoke-test.ps1
 ```
 
-The smoke test checks container status, service health endpoints, incident ingestion, incident listing, audit listing, and replay scoring.
+The smoke test checks service health, incident ingestion, incident listing, audit listing, and replay scoring.
 
-## Useful Commands
+## Main Components
 
-Backend:
-
-```powershell
-make lint
-make typecheck
-make test
-make replay
+```text
+services/      FastAPI services for ingress, routing, incidents, approvals, policy, and audit
+agents/        Triage, evidence, RCA, planner, and executor agents
+libs/          Shared contracts, policy, memory, observability, and runtime helpers
+adapters/      Telemetry, action, ITSM, and change-feed adapters
+ui/console/    React operator console
+policies/      Approval and execution rules
+tests/         Unit, flow, smoke, and LLM-related tests
 ```
 
-Frontend:
+## Recommended Future Structure
 
-```powershell
-cd ui\console
-npm run dev
-npm run build
-npm run preview
+The executive assessment recommends gradually moving toward this cleaner structure:
+
+```text
+apps/          API, worker, and console applications
+src/           Domain, workflows, agents, adapters, persistence, security
+scenarios/     Demonstration incident scenarios
+sample-workload/  Local checkout service used for demos
+infra/         Local and AWS infrastructure
+docs/          Operational readiness and executive artifacts
 ```
 
-Docker dependencies:
+See [files/ExecutiveAssessment.md](files/ExecutiveAssessment.md) for the full assessment and roadmap.
 
-```powershell
-docker compose -f docker-compose.dev.yml up -d
-docker compose -f docker-compose.dev.yml ps
-docker compose -f docker-compose.dev.yml down
-```
+## Current Status
 
-## Configuration
+This is a local development and demonstration platform. Some integrations are still stubbed, and real AWS remediation adapters are part of the recommended next phase.
 
-Backend configuration lives in `.env`. Start from `.env.example`.
-
-Important settings:
-
-| Variable | Purpose |
-| --- | --- |
-| `POSTGRES_DSN` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector endpoint |
-| `AGENTIC_ENABLED` | Enables server-side LLM-assisted behavior |
-| `LLM_BASE_URL` | LLM-compatible API base URL |
-| `LLM_MODEL` | Model name |
-| `LLM_API_KEY` | Server-side API key; never expose this to the frontend |
-| `EXECUTE_ACTION_DRY_RUN` | Forces execution actions to dry-run mode |
-| `CORS_ALLOW_ORIGINS` | Allowed browser origins for local console access |
-
-Frontend configuration lives in `ui/console/.env` when overrides are needed. The default Vite setup proxies `/api/*` routes to the local backend ports.
-
-## Current Capabilities
-
-- Structured incident domain models and state transitions.
-- Incident deduplication through Redis hot state.
-- Response routing through specialized agents.
-- Policy evaluation and approval records.
-- Audit event storage and retrieval.
-- OpenTelemetry instrumentation hooks.
-- Replay scoring for routing quality.
-- React console for operational workflows.
-
-## Current Limitations
-
-This repository is still a local lab, not a production-ready AWS operations platform.
-
-- Docker Compose currently starts only PostgreSQL, Redis, and the OpenTelemetry collector.
-- Backend services are started separately with `tests/start-backend-services.ps1`.
-- Telemetry and change-feed adapters default to stubs.
-- Execution adapters are not yet real AWS remediation integrations.
-- Post-action verification is still limited.
-- LLM mode requires server-side credentials and should be treated as optional.
-- Authentication and role-based approval controls are incomplete.
-
-See [files/ExecutiveAssessment.md](files/ExecutiveAssessment.md) for the full project assessment and recommended roadmap.
-
-## Recommended Evaluation Flow
-
-1. Start the local stack with the quick-start steps.
-2. Run `.\tests\smoke-test.ps1`.
-3. Open `http://localhost:5173`.
-4. Ingest or inspect incidents.
-5. Route an incident through the router service.
-6. Review policy decisions, approvals, execution traces, and audit events in the console.
-
-## Roadmap
-
-The next high-value improvements are:
-
-- Add a one-command `make demo` startup path.
-- Add a deterministic checkout-service failure scenario.
-- Replace fake-success execution behavior with a local workload adapter.
-- Add real recovery verification before resolving incidents.
-- Add narrow AWS adapters for CloudWatch and ECS.
-- Add durable idempotency and stricter approval-token enforcement.
-- Add operational-readiness documents, executive reporting, and resilience game-day artifacts.
-- Add CI for backend, frontend, integration, and security checks.

@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from agents.triage.agent import TriageAgent
-from agents.triage.schemas import TriageLLMOutput
-from libs.agent_runtime.llm import clear_llm_client_cache
-from libs.agent_runtime.settings import clear_agent_runtime_settings_cache
-from libs.contracts.models import IncidentEnvelope, IncidentRecord
+from src.agents.triage.agent import TriageAgent
+from src.agents.triage.schemas import TriageLLMOutput
+from src.agent_runtime.llm import clear_llm_client_cache
+from src.agent_runtime.settings import clear_agent_runtime_settings_cache
+from src.domain.contracts.models import IncidentEnvelope, IncidentRecord
 
 
 @pytest.mark.asyncio
@@ -42,7 +42,7 @@ async def test_triage_calls_llm_when_agentic_enabled(monkeypatch: pytest.MonkeyP
     )
     incident = IncidentRecord(incident_id="inc-1", metadata=envelope)
 
-    with patch("agents.triage.agent.get_llm_client", return_value=mock_client):
+    with patch("src.agents.triage.agent.get_llm_client", return_value=mock_client):
         agent = TriageAgent()
         result = await agent.run(incident)
 
@@ -71,7 +71,7 @@ async def test_triage_stub_when_agentic_disabled(monkeypatch: pytest.MonkeyPatch
     )
     incident = IncidentRecord(incident_id="inc-2", metadata=envelope)
 
-    with patch("agents.triage.agent.get_llm_client", return_value=mock_client):
+    with patch("src.agents.triage.agent.get_llm_client", return_value=mock_client):
         agent = TriageAgent()
         result = await agent.run(incident)
 

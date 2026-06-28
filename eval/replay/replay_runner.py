@@ -5,15 +5,15 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from agents.change_correlation.agent import ChangeCorrelationAgent
-from agents.evidence.agent import EvidenceAgent
-from agents.planner.agent import RemediationPlannerAgent
-from agents.rca.agent import RCAAgent
-from agents.triage.agent import TriageAgent
+from src.agents.change_correlation.agent import ChangeCorrelationAgent
+from src.agents.evidence.agent import EvidenceAgent
+from src.agents.planner.agent import RemediationPlannerAgent
+from src.agents.rca.agent import RCAAgent
+from src.agents.triage.agent import TriageAgent
 from eval.scoring.scorecard import compute_score
-from libs.contracts.models import ActionType, IncidentEnvelope, IncidentRecord
-from libs.policy.engine import PolicyEngine
-from services.router.response_plans import match_response_plan
+from src.domain.contracts.models import ActionType, IncidentEnvelope, IncidentRecord
+from src.domain.policies.engine import PolicyEngine
+from src.workflows.response_plans import match_response_plan
 
 
 def run_replay(dataset_path: Path) -> dict[str, float | int]:

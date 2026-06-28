@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pydantic import BaseModel
 
-from libs.agent_runtime.llm import clear_llm_client_cache, get_llm_client
-from libs.agent_runtime.settings import clear_agent_runtime_settings_cache, get_agent_runtime_settings
+from src.agent_runtime.llm import clear_llm_client_cache, get_llm_client
+from src.agent_runtime.settings import clear_agent_runtime_settings_cache, get_agent_runtime_settings
 
 
 class PingOut(BaseModel):

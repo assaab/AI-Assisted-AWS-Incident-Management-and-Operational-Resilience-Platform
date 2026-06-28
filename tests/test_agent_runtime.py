@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from libs.agent_runtime.budgets import LLMBudget
-from libs.agent_runtime.redaction import redact_for_logging
-from libs.agent_runtime.settings import AgentRuntimeSettings
+from src.agent_runtime.budgets import LLMBudget
+from src.agent_runtime.redaction import redact_for_logging
+from src.agent_runtime.settings import AgentRuntimeSettings
 
 
 def test_llm_budget_enforces_max_calls() -> None:
