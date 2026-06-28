@@ -1,5 +1,5 @@
-# Starts all FastAPI microservices used by the console and local workflows.
-# Requires: docker compose deps up, alembic upgrade head, venv activated or .venv present.
+# Starts the unified FastAPI backend used by the console and local workflows.
+# Requires: Postgres and Redis running, plus a venv activated or .venv present.
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -13,25 +13,13 @@ $env:POSTGRES_DSN = "postgresql+asyncpg://postgres:postgres@localhost:5432/sre_a
 $env:REDIS_URL = "redis://localhost:6379/0"
 $env:CORS_ALLOW_ORIGINS = "http://localhost:5173,http://localhost:5175"
 
-$services = @(
-    @{ Module = "apps.api.routers.ingress.app:app"; Port = 8001 },
-    @{ Module = "apps.api.routers.incident_store.app:app"; Port = 8002 },
-    @{ Module = "apps.api.routers.router.app:app"; Port = 8003 },
-    @{ Module = "apps.api.routers.policy_engine.app:app"; Port = 8004 },
-    @{ Module = "apps.api.routers.approval_api.app:app"; Port = 8005 },
-    @{ Module = "apps.api.routers.audit.app:app"; Port = 8006 }
+$argList = @(
+    "-m", "uvicorn",
+    "apps.api.main:app",
+    "--host", "127.0.0.1",
+    "--port", "8080"
 )
+Start-Process -FilePath $py -ArgumentList $argList -WorkingDirectory $root -WindowStyle Minimized
 
-foreach ($s in $services) {
-    $argList = @(
-        "-m", "uvicorn",
-        $s.Module,
-        "--host", "127.0.0.1",
-        "--port", "$($s.Port)"
-    )
-    Start-Process -FilePath $py -ArgumentList $argList -WorkingDirectory $root -WindowStyle Minimized
-    Start-Sleep -Milliseconds 400
-}
-
-Write-Host "Started uvicorn processes (minimized windows) on ports 8001-8006."
-Write-Host "Console expects: incident-store 8002, router 8003, audit 8006."
+Write-Host "Started unified API on http://127.0.0.1:8080."
+Write-Host "Console dev proxy expects the backend on port 8080."

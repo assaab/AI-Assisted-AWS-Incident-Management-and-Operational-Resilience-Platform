@@ -25,7 +25,7 @@ function pickPendingAction(inc: IncidentRecord): ActionRequest | null {
   return g.actions[0] ?? null;
 }
 
-/** Action id for approval API: prefer graph match, else incident.pending_approval_action_id. */
+/** Action id for approval: prefer graph match, else incident.pending_approval_action_id. */
 function approvalActionId(inc: IncidentRecord): string | null {
   const act = pickPendingAction(inc);
   if (act) {
@@ -223,7 +223,7 @@ export function IncidentWorkspace(props: Props): JSX.Element {
           <div className="panel-card__body">
             {filtered.length === 0 && (
               <p style={{ padding: "12px 8px", color: "var(--text-secondary)", margin: 0 }}>
-                No incidents match your filter. Ingest a payload via POST /ingest on port 8001 to create one.
+                No incidents match your filter. Create one with POST /alerts on the unified API.
               </p>
             )}
             {filtered.map((inc) => {
@@ -317,7 +317,7 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                         .finally(() => setRouting(false));
                     }}
                   >
-                    {routing ? "Routing..." : "Run agents (POST /route)"}
+                    {routing ? "Investigating..." : "Investigate"}
                   </button>
                   <button
                     type="button"
@@ -333,7 +333,7 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                         .finally(() => setPlanning(false));
                     }}
                   >
-                    {planning ? "Planning..." : "Create plan (POST /plan)"}
+                    {planning ? "Planning..." : "Refresh plan"}
                   </button>
                 </div>
               )}
@@ -386,7 +386,7 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                     <dt style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>Response plan</dt>
                     <dd style={{ margin: 0 }}>
                       {selected.response_plan?.plan_id ?? (
-                        <span style={{ color: "var(--text-tertiary)" }}>Not routed yet (call POST /route)</span>
+                        <span style={{ color: "var(--text-tertiary)" }}>Not investigated yet</span>
                       )}
                     </dd>
                     {selected.response_plan?.policy_class && (
@@ -450,8 +450,8 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                       <span className="inspector-approval-prompt__badge">Action needed</span>
                       <h3 className="inspector-approval-prompt__title">Waiting for your approval</h3>
                       <p className="inspector-approval-prompt__desc">
-                        Review the pending action below, then approve or deny. This posts to the approval API (port
-                        8005) using the current incident version.
+                        Review the pending action below, then approve or deny. This posts to the unified API using the
+                        current incident version.
                       </p>
                     </div>
                     {(() => {
@@ -715,7 +715,7 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                   <section style={{ marginBottom: 20 }}>
                     <h3 style={sectionTitle}>Execute pending action</h3>
                     <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 8px" }}>
-                      Calls <code className="code-inline">POST /execute</code> on the router. Policy may require a
+                      Calls <code className="code-inline">POST /incidents/{selected.incident_id}/execute</code>. Policy may require a
                       matching approval record below.
                     </p>
                     {(() => {
@@ -799,12 +799,12 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                 <section style={{ marginBottom: 20 }}>
                   <h3 style={sectionTitle}>Workflow</h3>
                   <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 8px" }}>
-                    Steps recorded by the router during processing. Empty until an incident is routed.
+                    Steps recorded during processing. Empty until an incident is investigated.
                   </p>
                   {(selected.agent_path?.length ?? 0) === 0 ? (
                     <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: 0 }}>
                       No steps yet. Route this incident with{" "}
-                      <code className="code-inline">POST /route/{selected.incident_id}</code> on port 8003.
+                      <code className="code-inline">POST /incidents/{selected.incident_id}/investigate</code>.
                     </p>
                   ) : (
                     <ol style={{ margin: 0, paddingLeft: 20, color: "var(--text)", fontSize: 13 }}>

@@ -1,4 +1,4 @@
-# End-to-end smoke: Docker health, migrations implied, API health, ingest, UI-facing reads.
+# End-to-end smoke: Docker health, API health, alert ingest, UI-facing reads.
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -25,14 +25,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "`n=== Service healthz ==="
-$ports = 8001..8006
+Write-Host "`n=== API health ==="
 $ok = $true
-foreach ($p in $ports) {
-    if (-not (Test-Url "port $p" "http://127.0.0.1:$p/healthz")) { $ok = $false }
-}
+if (-not (Test-Url "GET /livez" "http://127.0.0.1:8080/livez")) { $ok = $false }
 
-Write-Host "`n=== Ingest sample incident (ingress 8001) ==="
+Write-Host "`n=== Create sample alert ==="
 $body = @{
     source = "smoke-test"
     severity = "warning"
@@ -42,17 +39,17 @@ $body = @{
 } | ConvertTo-Json
 
 try {
-    $ing = Invoke-RestMethod -Uri "http://127.0.0.1:8001/ingest" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 30
-    Write-Host "[ok] Ingested incident_id: $($ing.incident_id)"
+    $ing = Invoke-RestMethod -Uri "http://127.0.0.1:8080/alerts" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 30
+    Write-Host "[ok] Created incident_id: $($ing.incident_id)"
 } catch {
-    Write-Host "[fail] Ingest: $_"
+    Write-Host "[fail] Alert ingest: $_"
     $ok = $false
 }
 
 Write-Host "`n=== Console API reads ==="
-if (-not (Test-Url "GET /incidents" "http://127.0.0.1:8002/incidents")) { $ok = $false }
-if (-not (Test-Url "GET /events" "http://127.0.0.1:8006/events")) { $ok = $false }
-if (-not (Test-Url "GET /replay/score" "http://127.0.0.1:8003/replay/score")) { $ok = $false }
+if (-not (Test-Url "GET /incidents" "http://127.0.0.1:8080/incidents")) { $ok = $false }
+if (-not (Test-Url "GET /events" "http://127.0.0.1:8080/events")) { $ok = $false }
+if (-not (Test-Url "GET /replay/score" "http://127.0.0.1:8080/replay/score")) { $ok = $false }
 
 if ($ok) {
     Write-Host "`nSmoke test passed."

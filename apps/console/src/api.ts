@@ -10,9 +10,8 @@ import {
 } from "./types";
 
 /**
- * In dev, prefer same-origin `/api/*` proxies (see vite.config.ts) so requests are not blocked by CORS
- * when the UI is opened as http://127.0.0.1:5173 but backends use localhost (or vice versa).
- * Set VITE_*_URL in apps/console/.env to override.
+ * In dev, prefer the same-origin `/api` proxy (see vite.config.ts) so requests are not blocked by CORS.
+ * Set VITE_API_URL in apps/console/.env to override.
  */
 function baseFromEnvOrDevProxy(envUrl: string | undefined, devProxyPath: string, fallback: string): string {
   if (envUrl && envUrl.length > 0) {
@@ -24,28 +23,7 @@ function baseFromEnvOrDevProxy(envUrl: string | undefined, devProxyPath: string,
   return fallback;
 }
 
-const incidentStoreBase = baseFromEnvOrDevProxy(
-  import.meta.env.VITE_INCIDENT_STORE_URL,
-  "/api/incidents-store",
-  "http://localhost:8080"
-);
-const auditBase = baseFromEnvOrDevProxy(import.meta.env.VITE_AUDIT_URL, "/api/audit", "http://localhost:8080");
-const routerBase = baseFromEnvOrDevProxy(import.meta.env.VITE_ROUTER_URL, "/api/router", "http://localhost:8080");
-const approvalBase = baseFromEnvOrDevProxy(
-  import.meta.env.VITE_APPROVAL_URL,
-  "/api/approval",
-  "http://localhost:8080"
-);
-const scenarioBase = baseFromEnvOrDevProxy(
-  import.meta.env.VITE_SCENARIO_URL,
-  "/api/scenario",
-  "http://localhost:8080"
-);
-const readinessBase = baseFromEnvOrDevProxy(
-  import.meta.env.VITE_READINESS_URL,
-  "/api/readiness",
-  "http://localhost:8080"
-);
+const apiBase = baseFromEnvOrDevProxy(import.meta.env.VITE_API_URL, "/api", "http://localhost:8080");
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -62,7 +40,7 @@ export async function loadDashboard(): Promise<DashboardLoad> {
 
   let incidents: IncidentRecord[] = [];
   try {
-    const r = await fetch(`${incidentStoreBase}/incidents`);
+    const r = await fetch(`${apiBase}/incidents`);
     if (!r.ok) {
       loadErrors.push(`Incident store returned ${r.status}`);
     } else {
@@ -74,7 +52,7 @@ export async function loadDashboard(): Promise<DashboardLoad> {
 
   let auditEvents: AuditEvent[] = [];
   try {
-    const r = await fetch(`${auditBase}/events`);
+    const r = await fetch(`${apiBase}/events`);
     if (!r.ok) {
       loadErrors.push(`Audit API returned ${r.status}`);
     } else {
@@ -86,7 +64,7 @@ export async function loadDashboard(): Promise<DashboardLoad> {
 
   let score: ReplayScore | null = null;
   try {
-    const r = await fetch(`${routerBase}/replay/score`);
+    const r = await fetch(`${apiBase}/replay/score`);
     if (!r.ok) {
       loadErrors.push(`Router replay returned ${r.status}`);
       score = emptyScore;
@@ -103,7 +81,7 @@ export async function loadDashboard(): Promise<DashboardLoad> {
 
 /** Latest incident from the store (use before execute/approval to avoid stale version). */
 export async function fetchIncident(incidentId: string): Promise<IncidentRecord> {
-  const r = await fetch(`${incidentStoreBase}/incidents/${encodeURIComponent(incidentId)}`);
+  const r = await fetch(`${apiBase}/incidents/${encodeURIComponent(incidentId)}`);
   if (!r.ok) {
     const detail = await r.text();
     throw new Error(`Failed to load incident (${r.status}): ${detail}`);
@@ -112,7 +90,7 @@ export async function fetchIncident(incidentId: string): Promise<IncidentRecord>
 }
 
 export async function routeIncident(incidentId: string): Promise<void> {
-  const r = await fetch(`${routerBase}/route/${encodeURIComponent(incidentId)}`, {
+  const r = await fetch(`${apiBase}/incidents/${encodeURIComponent(incidentId)}/investigate`, {
     method: "POST",
     headers: jsonHeaders
   });
@@ -123,7 +101,7 @@ export async function routeIncident(incidentId: string): Promise<void> {
 }
 
 export async function planIncident(incidentId: string): Promise<void> {
-  const r = await fetch(`${routerBase}/plan/${encodeURIComponent(incidentId)}`, {
+  const r = await fetch(`${apiBase}/incidents/${encodeURIComponent(incidentId)}/investigate`, {
     method: "POST",
     headers: jsonHeaders
   });
@@ -146,7 +124,7 @@ export async function submitApproval(
   incidentId: string,
   body: ApprovalSubmit
 ): Promise<{ approval_id: string; approval_token: string }> {
-  const url = `${approvalBase}/incidents/${encodeURIComponent(incidentId)}/approvals`;
+  const url = `${apiBase}/incidents/${encodeURIComponent(incidentId)}/approve`;
   let r: Response;
   try {
     r = await fetch(url, {
@@ -163,8 +141,8 @@ export async function submitApproval(
     });
   } catch (e) {
     const hint =
-      "Cannot reach the approval API. Start it on port 8080, or set VITE_APPROVAL_URL in apps/console/.env. " +
-      "If the UI and API use different hostnames (localhost vs 127.0.0.1), use `npm run dev` proxies or " +
+      "Cannot reach the API. Start it on port 8080, or set VITE_API_URL in apps/console/.env. " +
+      "If the UI and API use different hostnames (localhost vs 127.0.0.1), use `npm run dev` proxy or " +
       "add your page origin to the API CORS_ALLOW_ORIGINS.";
     if (e instanceof TypeError) {
       throw new Error(`${e.message}. ${hint}`);
@@ -200,10 +178,16 @@ export async function executeIncidentAction(
     approval_token: opts.approvalToken ?? undefined,
     expected_incident_version: opts.expectedVersion
   };
-  const r = await fetch(`${routerBase}/execute/${encodeURIComponent(incidentId)}`, {
+  const r = await fetch(`${apiBase}/incidents/${encodeURIComponent(incidentId)}/execute`, {
     method: "POST",
     headers: jsonHeaders,
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      action_id: action.action_id,
+      autonomous: payload.autonomous,
+      approval_id: payload.approval_id,
+      approval_token: payload.approval_token,
+      dry_run: opts.dryRun
+    })
   });
   if (!r.ok) {
     const detail = await r.text();
@@ -213,7 +197,7 @@ export async function executeIncidentAction(
 }
 
 export async function runCheckoutDeploymentFailureScenario(): Promise<IncidentRecord> {
-  const r = await fetch(`${scenarioBase}/scenario/checkout-deployment-failure`, {
+  const r = await fetch(`${apiBase}/scenario/checkout-deployment-failure`, {
     method: "POST",
     headers: jsonHeaders
   });
@@ -226,7 +210,7 @@ export async function runCheckoutDeploymentFailureScenario(): Promise<IncidentRe
 }
 
 export async function fetchReadinessWorkspace(): Promise<ReadinessWorkspace> {
-  const r = await fetch(`${readinessBase}/readiness/workloads/checkout-service`);
+  const r = await fetch(`${apiBase}/readiness/workloads/checkout-service`);
   if (!r.ok) {
     const detail = await r.text();
     throw new Error(`Readiness workspace failed (${r.status}): ${detail}`);
@@ -235,7 +219,7 @@ export async function fetchReadinessWorkspace(): Promise<ReadinessWorkspace> {
 }
 
 export async function generateIncidentReport(incidentId: string): Promise<IncidentReport> {
-  const r = await fetch(`${incidentStoreBase}/incidents/${encodeURIComponent(incidentId)}/report`, {
+  const r = await fetch(`${apiBase}/incidents/${encodeURIComponent(incidentId)}/report`, {
     method: "POST",
     headers: jsonHeaders
   });

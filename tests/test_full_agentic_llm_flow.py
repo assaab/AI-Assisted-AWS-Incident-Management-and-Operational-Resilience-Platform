@@ -1,5 +1,5 @@
 """
-End-to-end flow: ingest -> POST /route -> POST /plan with live LLMs only (no stub fallback).
+End-to-end flow: POST /alerts -> investigate -> approve -> execute with live LLMs only (no stub fallback).
 
 Requires LLM credentials: set LLM_API_KEY (and AGENTIC_ENABLED=true) in environment or repo `.env`.
 Skip if missing. Run explicitly: pytest tests/test_full_agentic_llm_flow.py -v
@@ -12,11 +12,9 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import ASGITransport, AsyncClient, TransportError
 
-from apps.api.routers.approval_api.app import app as approval_app
-from apps.api.routers.ingress.app import app as ingress_app
-from apps.api.routers.router.app import app as router_app
+from apps.api.main import app
 from src.agent_runtime.llm import OpenAICompatibleClient, clear_llm_client_cache
 from src.agent_runtime.settings import clear_agent_runtime_settings_cache, get_agent_runtime_settings
 from tests.conftest import load_dotenv_into_os_environ
@@ -65,15 +63,13 @@ def test_full_flow_ingest_route_plan_uses_llm_only(monkeypatch: pytest.MonkeyPat
     clear_llm_client_cache()
 
     async def run_flow() -> None:
-        ingress_transport = ASGITransport(app=ingress_app)
-        router_transport = ASGITransport(app=router_app)
-        approval_transport = ASGITransport(app=approval_app)
+        transport = ASGITransport(app=app)
         token = uuid4().hex[:8]
         symptom = f"cpu spike and error spike on checkout ({token})"
 
-        async with AsyncClient(transport=ingress_transport, base_url="http://test") as ingress_client:
-            ingest_response = await ingress_client.post(
-                "/ingest",
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            ingest_response = await client.post(
+                "/alerts",
                 json={
                     "source": "webhook",
                     "severity": "critical",
@@ -82,38 +78,30 @@ def test_full_flow_ingest_route_plan_uses_llm_only(monkeypatch: pytest.MonkeyPat
                     "symptom": symptom,
                 },
             )
-        assert ingest_response.status_code == 200
-        incident = ingest_response.json()
-        incident_id = incident["incident_id"]
+            assert ingest_response.status_code == 200
+            incident = ingest_response.json()
+            incident_id = incident["incident_id"]
 
-        route_posts_before = len(llm_http_posts)
-        async with AsyncClient(transport=router_transport, base_url="http://test") as router_client:
-            route_response = await router_client.post(f"/route/{incident_id}")
-        assert route_response.status_code == 200
-        routed = route_response.json()
-        route_llm_calls = len(llm_http_posts) - route_posts_before
-        assert route_llm_calls >= 4, "expected triage, evidence, change_correlation, rca LLM calls"
+            investigate_posts_before = len(llm_http_posts)
+            investigate_response = await client.post(f"/incidents/{incident_id}/investigate")
+            assert investigate_response.status_code == 200
+            investigated = investigate_response.json()
+            investigate_llm_calls = len(llm_http_posts) - investigate_posts_before
+            assert investigate_llm_calls >= 5, "expected triage, evidence, change_correlation, rca, planner LLM calls"
 
-        hypotheses = routed.get("hypotheses") or []
-        assert len(hypotheses) >= 1
-        triage_blocks = [h for h in hypotheses if "triage" in h]
-        assert triage_blocks, "triage agent output missing from incident"
+            hypotheses = investigated.get("hypotheses") or []
+            assert len(hypotheses) >= 1
+            triage_blocks = [h for h in hypotheses if "triage" in h]
+            assert triage_blocks, "triage agent output missing from incident"
 
-        evidence = routed.get("evidence") or []
-        assert len(evidence) >= 1
+            evidence = investigated.get("evidence") or []
+            assert len(evidence) >= 1
 
-        plan_posts_before = len(llm_http_posts)
-        async with AsyncClient(transport=router_transport, base_url="http://test") as router_client:
-            plan_response = await router_client.post(f"/plan/{incident_id}")
-        assert plan_response.status_code == 200
-        graph = plan_response.json()
-        plan_llm_calls = len(llm_http_posts) - plan_posts_before
-        assert plan_llm_calls >= 1, "expected planner LLM call"
-        assert graph.get("actions"), "planner produced no actions"
+            graph = investigated["pending_action_graph"]
+            assert graph.get("actions"), "planner produced no actions"
 
-        async with AsyncClient(transport=approval_transport, base_url="http://test") as approval_client:
-            approval_response = await approval_client.post(
-                f"/incidents/{incident_id}/approvals",
+            approval_response = await client.post(
+                f"/incidents/{incident_id}/approve",
                 json={
                     "approver": "oncall@example.local",
                     "action_id": graph["actions"][0]["action_id"],
@@ -121,22 +109,22 @@ def test_full_flow_ingest_route_plan_uses_llm_only(monkeypatch: pytest.MonkeyPat
                     "reason": "validated",
                 },
             )
-        assert approval_response.status_code == 200
-        approval_id = approval_response.json()["approval"]["approval_id"]
+            assert approval_response.status_code == 200
 
-        async with AsyncClient(transport=router_transport, base_url="http://test") as router_client:
-            execute_response = await router_client.post(
-                f"/execute/{incident_id}",
+            execute_response = await client.post(
+                f"/incidents/{incident_id}/execute",
                 json={
-                    "action": graph["actions"][0],
-                    "autonomous": False,
-                    "approval_id": approval_id,
+                    "action_id": graph["actions"][0]["action_id"],
+                    "dry_run": True,
                 },
             )
-        assert execute_response.status_code == 200
-        body = execute_response.json()
-        assert body["result"]["success"] is True
+            assert execute_response.status_code == 200
+            body = execute_response.json()
+            assert body["result"]["success"] is True
 
-        assert len(llm_http_posts) >= 5
+            assert len(llm_http_posts) >= 5
 
-    asyncio.run(run_flow())
+    try:
+        asyncio.run(run_flow())
+    except TransportError as exc:
+        pytest.skip(f"LLM endpoint is not reachable: {exc}")

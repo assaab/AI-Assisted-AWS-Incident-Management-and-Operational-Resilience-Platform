@@ -32,7 +32,7 @@ verify:
 	$(PYTHON) scripts/wait_for_stack.py
 
 scenario-checkout-failure:
-	$(COMPOSE) run --rm scenario
+	$(PYTHON) scripts/scenario_checkout_failure.py
 
 incident-report:
 	$(PYTHON) scripts/incident_report.py

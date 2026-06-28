@@ -1,10 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_INCIDENT_STORE_URL?: string;
-  readonly VITE_AUDIT_URL?: string;
-  readonly VITE_ROUTER_URL?: string;
-  readonly VITE_APPROVAL_URL?: string;
+  readonly VITE_API_URL?: string;
+  readonly VITE_API_PROXY_TARGET?: string;
 }
 
 interface ImportMeta {

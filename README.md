@@ -1,8 +1,12 @@
 # AI-Assisted AWS Incident Management and Operational Resilience Platform
 
-This project demonstrates how an operations team can recover a business-critical AWS-style checkout workload after a bad deployment. It models the full operating motion: detect the incident, collect telemetry and change evidence, diagnose the likely regression, propose a controlled rollback, require approval, execute through a real local adapter, verify recovery, and produce audit and incident-report artifacts.
+This project shows how an operations team can detect and recover from a failure in a critical application using one FastAPI backend and one React dashboard.
 
-The local demo does not require a cloud account or an LLM key. It runs a deterministic checkout service simulator and keeps cloud actions dry-run by default.
+The demo simulates a checkout service that starts failing after a bad deployment on-prem. The system detects the problem, checks metrics and recent changes, identifies the likely cause, recommends a safe rollback, waits for human approval, applies the fix, and confirms that the service has recovered.
+
+Everything is recorded for auditing and incident reporting.
+
+The demo runs locally without an AWS account or AI API key. Real cloud actions remain disabled by default for safety.
 
 ## Demo Scenario
 
@@ -38,6 +42,17 @@ Health:   http://localhost:8080/readyz
 
 The console has a **Run checkout deployment failure scenario** button for the same deterministic flow.
 
+The primary API is consolidated for a portfolio demo:
+
+```text
+POST /alerts
+GET  /incidents
+POST /incidents/{id}/investigate
+POST /incidents/{id}/approve
+POST /incidents/{id}/execute
+GET  /incidents/{id}/audit
+```
+
 ## Operational Artifacts
 
 - [Customer enablement plan](docs/customer-enablement-plan.md)
@@ -55,7 +70,7 @@ The console has a **Run checkout deployment failure scenario** button for the sa
 ## Commands
 
 ```powershell
-make demo                    # full stack: API, worker, console, checkout workload, Postgres, Redis, OTEL
+make demo                    # app stack: API, console, checkout workload, Postgres, Redis
 make down                    # stop containers
 make reset                   # recreate containers and volumes
 make logs                    # follow stack logs

@@ -166,7 +166,7 @@ export function App(): JSX.Element {
             <summary>Agent setup</summary>
             <div className="sidebar__help-body">
               On the server, set <code>AGENTIC_ENABLED=true</code> and a compatible <code>LLM_BASE_URL</code> (see
-              README). This console calls <code>POST /route</code> to run agents.
+              README). This console calls <code>POST /incidents/&lbrace;id&rbrace;/investigate</code> to run agents.
             </div>
           </details>
         </div>
