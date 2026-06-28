@@ -1,4 +1,5 @@
 """Compare triage stub output vs agentic LLM output for the same incident (live API when enabled)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,14 +10,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.agents.triage.agent import TriageAgent
 from src.agent_runtime.llm import clear_llm_client_cache
 from src.agent_runtime.settings import clear_agent_runtime_settings_cache, get_agent_runtime_settings
+from src.agents.triage.agent import TriageAgent
 from src.domain.contracts.models import IncidentEnvelope, IncidentRecord
 
 
 def _incident() -> IncidentRecord:
-    # No "cpu" in symptom: stub -> incident_type general, probable_domains [application], priority p2 for severity critical
+    # No "cpu" in symptom: stub returns general/application with p2 priority for critical severity.
     envelope = IncidentEnvelope(
         source="alertmanager",
         severity="critical",

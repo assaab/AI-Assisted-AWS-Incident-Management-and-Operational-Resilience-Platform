@@ -4,8 +4,8 @@ from datetime import datetime
 
 import pytest
 
-from src.domain.contracts.models import IncidentEnvelope, IncidentRecord
 from apps.api.routers.router.hybrid_router import compute_router_decision, merge_router_allowed_with_plan
+from src.domain.contracts.models import IncidentEnvelope, IncidentRecord
 from src.workflows.response_plans import match_response_plan
 
 

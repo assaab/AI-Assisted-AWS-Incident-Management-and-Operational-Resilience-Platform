@@ -87,8 +87,8 @@ def test_high_risk_rule_always_requires_approval() -> None:
 def test_investigate_only_execute_blocked_when_flag_set(monkeypatch) -> None:
     from httpx import ASGITransport, AsyncClient
 
-    from src.domain.contracts.models import IncidentState, RouterDecision
     from apps.api.routers.router.app import app as router_app
+    from src.domain.contracts.models import IncidentState, RouterDecision
 
     monkeypatch.setenv("BLOCK_EXECUTE_WHEN_INVESTIGATE_ONLY", "true")
 

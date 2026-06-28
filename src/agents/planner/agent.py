@@ -5,15 +5,14 @@ from uuid import uuid4
 
 import httpx
 
-from src.agents.planner.prompts import PLANNER_SYSTEM
-from src.agents.planner.schemas import PlannerLLMOutput
 from src.agent_runtime.llm import StructuredLLMError, get_llm_client
 from src.agent_runtime.settings import get_agent_runtime_settings
 from src.agent_runtime.tracing import agent_span
-
+from src.agents.planner.prompts import PLANNER_SYSTEM
+from src.agents.planner.schemas import PlannerLLMOutput
 from src.domain.contracts.models import ActionGraph, ActionRequest, ActionType, IncidentRecord, PlanStep
-from src.persistence.memory.working_memory import search_incident_memory
 from src.observability.logging import get_logger
+from src.persistence.memory.working_memory import search_incident_memory
 
 _logger = get_logger("planner-agent")
 
@@ -63,16 +62,21 @@ class RemediationPlannerAgent:
                 return self._stub_graph(incident)
 
     def _default_dry_run_for_plan(self) -> bool:
-        return os.getenv("PLANNER_DEFAULT_DRY_RUN", "false").lower() == "true"
+        return os.getenv("PLANNER_DEFAULT_DRY_RUN", "true").lower() == "true"
 
     def _build_plan_steps(self, actions: list[ActionRequest], blast_radius: str) -> list[PlanStep]:
         steps: list[PlanStep] = []
         for i, a in enumerate(actions):
-            risk = "high" if a.action_type in {
-                ActionType.ROLLBACK_DEPLOYMENT,
-                ActionType.DRAIN_NODE,
-                ActionType.RUN_ANSIBLE_JOB,
-            } else "medium"
+            risk = (
+                "high"
+                if a.action_type
+                in {
+                    ActionType.ROLLBACK_DEPLOYMENT,
+                    ActionType.DRAIN_NODE,
+                    ActionType.RUN_ANSIBLE_JOB,
+                }
+                else "medium"
+            )
             steps.append(
                 PlanStep(
                     step_id=f"ps_{uuid4().hex[:8]}",
@@ -125,25 +129,41 @@ class RemediationPlannerAgent:
 
     def _stub_graph(self, incident: IncidentRecord) -> ActionGraph:
         dry = self._default_dry_run_for_plan()
-        incident.last_planner_confidence = 0.88
-        action_candidates = [
-            ActionRequest(
-                action_id=f"act_{uuid4().hex[:8]}",
-                action_type=ActionType.RESTART_SERVICE,
-                target=incident.metadata.resource,
-                parameters={"service": incident.metadata.service},
-                idempotency_key=f"{incident.incident_id}:restart",
-                dry_run=dry,
-            ),
-            ActionRequest(
-                action_id=f"act_{uuid4().hex[:8]}",
-                action_type=ActionType.SCALE_WORKLOAD,
-                target=incident.metadata.resource,
-                parameters={"service": incident.metadata.service, "maxReplicas": 5},
-                idempotency_key=f"{incident.incident_id}:scale",
-                dry_run=dry,
-            ),
-        ]
+        incident.last_planner_confidence = 0.92
+        if incident.metadata.service == "checkout-service" and "deployment" in incident.metadata.symptom.lower():
+            action_candidates = [
+                ActionRequest(
+                    action_id=f"act_{uuid4().hex[:8]}",
+                    action_type=ActionType.ROLLBACK_DEPLOYMENT,
+                    target=incident.metadata.resource,
+                    parameters={
+                        "service": incident.metadata.service,
+                        "deployment": "checkout-service",
+                        "to_revision": "checkout-r42",
+                    },
+                    idempotency_key=f"{incident.incident_id}:rollback:checkout-r42",
+                    dry_run=dry,
+                )
+            ]
+        else:
+            action_candidates = [
+                ActionRequest(
+                    action_id=f"act_{uuid4().hex[:8]}",
+                    action_type=ActionType.RESTART_SERVICE,
+                    target=incident.metadata.resource,
+                    parameters={"service": incident.metadata.service},
+                    idempotency_key=f"{incident.incident_id}:restart",
+                    dry_run=dry,
+                ),
+                ActionRequest(
+                    action_id=f"act_{uuid4().hex[:8]}",
+                    action_type=ActionType.SCALE_WORKLOAD,
+                    target=incident.metadata.resource,
+                    parameters={"service": incident.metadata.service, "maxReplicas": 5},
+                    idempotency_key=f"{incident.incident_id}:scale",
+                    dry_run=dry,
+                ),
+            ]
         steps = self._build_plan_steps(action_candidates, "single service")
         return ActionGraph(
             objective="Restore service stability while minimizing blast radius",

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import httpx
 
-from src.agents.triage.prompts import TRIAGE_SYSTEM
-from src.agents.triage.schemas import TriageLLMOutput
 from src.agent_runtime.llm import StructuredLLMError, get_llm_client
 from src.agent_runtime.settings import get_agent_runtime_settings
 from src.agent_runtime.tracing import agent_span
+from src.agents.triage.prompts import TRIAGE_SYSTEM
+from src.agents.triage.schemas import TriageLLMOutput
 from src.domain.contracts.models import IncidentRecord
 from src.observability.logging import get_logger
 

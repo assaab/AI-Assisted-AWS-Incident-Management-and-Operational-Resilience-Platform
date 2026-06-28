@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { loadDashboard } from "./api";
+import { loadDashboard, runCheckoutDeploymentFailureScenario } from "./api";
 import { IncidentWorkspace } from "./components/IncidentWorkspace";
 import "./index.css";
 import { DashboardLoad, IncidentRecord } from "./types";
@@ -90,6 +90,7 @@ export function App(): JSX.Element {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [scenarioRunning, setScenarioRunning] = useState(false);
 
   const refresh = useCallback(async (): Promise<void> => {
     setError(null);
@@ -171,6 +172,21 @@ export function App(): JSX.Element {
             )}
             <button type="button" className="btn btn--secondary" onClick={() => void refresh()} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh now"}
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={scenarioRunning}
+              onClick={() => {
+                setScenarioRunning(true);
+                setError(null);
+                void runCheckoutDeploymentFailureScenario()
+                  .then(() => refresh())
+                  .catch((e: Error) => setError(e.message))
+                  .finally(() => setScenarioRunning(false));
+              }}
+            >
+              {scenarioRunning ? "Running scenario..." : "Run checkout deployment failure scenario"}
             </button>
           </div>
         </header>

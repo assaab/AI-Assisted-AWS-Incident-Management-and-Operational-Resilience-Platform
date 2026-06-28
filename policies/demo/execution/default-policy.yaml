@@ -23,6 +23,8 @@ allowedTargetPatterns:
   - arc/*
   - localhost
   - local/*
+  - checkout-service
+  - checkout/*
 maxRetriesByAction:
   RestartService: 1
   ScaleWorkload: 1

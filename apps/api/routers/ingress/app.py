@@ -6,11 +6,11 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from src.domain.contracts.models import IncidentRecord
-from src.persistence.memory import RedisHotStateProvider
-from src.observability import get_logger, instrument_fastapi, set_request_id
 from apps.api.routers.incident_store.repository import repository
 from apps.api.routers.ingress.normalizer import normalize
+from src.domain.contracts.models import IncidentRecord
+from src.observability import get_logger, instrument_fastapi, set_request_id
+from src.persistence.memory import RedisHotStateProvider
 
 app = FastAPI(title="ingress")
 instrument_fastapi(app)

@@ -4,20 +4,20 @@ import asyncio
 import random
 from typing import Final
 
+from apps.api.routers.audit.store import audit_store
 from src.adapters.actions.typed_adapters import TypedActionAdapterRegistry
 from src.agent_runtime.sandbox import is_privileged_action, log_nemoclaw_style_sandbox
 from src.agent_runtime.settings import get_agent_runtime_settings
 from src.domain.contracts.models import ActionRequest
 from src.observability.logging import get_logger
+from src.persistence.idempotency import idempotency_store
 from src.security.context import SecurityContext
-from apps.api.routers.audit.store import audit_store
 
 
 class ActionExecutor:
     def __init__(self) -> None:
         self._logger = get_logger("action-executor")
         self.registry = TypedActionAdapterRegistry()
-        self.seen_idempotency_keys: set[str] = set()
         self._default_retry_limit: Final[int] = 3
 
     async def _run_with_retries(self, action: ActionRequest, context: SecurityContext) -> tuple[bool, str]:
@@ -40,7 +40,7 @@ class ActionExecutor:
         return False, "Action failed after retries"
 
     async def execute(self, action: ActionRequest) -> tuple[bool, str]:
-        if action.idempotency_key in self.seen_idempotency_keys:
+        if not await idempotency_store.claim(action.idempotency_key, action.action_id):
             return True, f"Skipped duplicate idempotency key {action.idempotency_key}"
 
         if get_agent_runtime_settings().sandbox_enabled and is_privileged_action(action):
@@ -52,14 +52,14 @@ class ActionExecutor:
             allowed_targets=[action.target, "k8s-*", "arc-*"],
         )
         success, message = await self._run_with_retries(action, context)
-        if success:
-            self.seen_idempotency_keys.add(action.idempotency_key)
         await audit_store.append(
             "adapter_execution",
             {
                 "action_id": action.action_id,
                 "action_type": action.action_type.value,
                 "target": action.target,
+                "idempotency_key": action.idempotency_key,
+                "dry_run": action.dry_run,
                 "success": success,
                 "message": message,
             },

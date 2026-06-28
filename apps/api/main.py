@@ -1,21 +1,206 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+from datetime import datetime, timedelta
+from pathlib import Path
+from uuid import uuid4
 
+import redis.asyncio as redis
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from apps.api.routers.approval_api.app import app as approval_app
+from apps.api.routers.audit.app import app as audit_app
+from apps.api.routers.audit.store import audit_store
+from apps.api.routers.incident_store.app import app as incident_store_app
+from apps.api.routers.incident_store.repository import repository
+from apps.api.routers.ingress.app import app as ingress_app
+from apps.api.routers.ingress.normalizer import normalize
+from apps.api.routers.router.app import app as router_app
+from src.adapters.local.checkout_client import CheckoutServiceClient
+from src.agents.change_correlation.agent import ChangeCorrelationAgent
+from src.agents.evidence.agent import EvidenceAgent
+from src.agents.executor.agent import ExecutionAgent
+from src.agents.planner.agent import RemediationPlannerAgent
+from src.agents.rca.agent import RCAAgent
+from src.agents.triage.agent import TriageAgent
+from src.config import get_app_settings
+from src.domain.contracts.models import ApprovalRecord, ExecutionTraceEntry, IncidentRecord, IncidentState
 from src.observability import instrument_fastapi
+from src.workflows.incident_workflow import execute_route
 
 app = FastAPI(
-    title="operations-api",
-    description="Transitional API entry point for the operations control plane.",
+    title="Mission-Critical Operations API",
+    description="Operational readiness and incident orchestration API for the checkout deployment regression demo.",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 instrument_fastapi(app)
 
+for sub_app in (ingress_app, incident_store_app, router_app, approval_app, audit_app):
+    app.include_router(sub_app.router)
 
-@app.get("/healthz")
-async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+
+@app.get("/livez")
+async def livez() -> dict[str, str]:
+    return {"status": "live"}
 
 
 @app.get("/readyz")
-async def readyz() -> dict[str, str]:
-    return {"status": "ready"}
+async def readyz() -> dict[str, object]:
+    settings = get_app_settings()
+    checks: dict[str, object] = {"demo_mode": settings.demo_mode, "execution_mode": settings.execution_mode}
+    try:
+        engine = create_async_engine(settings.postgres_dsn, pool_pre_ping=True)
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+        await engine.dispose()
+        checks["postgres"] = "ok"
+    except Exception as exc:
+        checks["postgres"] = str(exc)
+    try:
+        client = redis.from_url(settings.redis_url, decode_responses=True)
+        await client.ping()
+        await client.aclose()
+        checks["redis"] = "ok"
+    except Exception as exc:
+        checks["redis"] = str(exc)
+    if settings.execution_mode == "local":
+        try:
+            checks["checkout"] = await CheckoutServiceClient().health()
+        except Exception as exc:
+            checks["checkout"] = str(exc)
+    if all(value == "ok" or isinstance(value, (bool, dict)) for value in checks.values()):
+        return {"status": "ready", "checks": checks}
+    if settings.demo_mode:
+        return {"status": "degraded", "checks": checks}
+    raise HTTPException(status_code=503, detail=checks)
+
+
+async def _write_checkpoint(incident: IncidentRecord, step: str) -> None:
+    if step not in incident.agent_path:
+        incident.agent_path.append(step)
+    await repository.upsert(incident)
+    await audit_store.append("workflow_checkpoint", {"incident_id": incident.incident_id, "step": step})
+
+
+def _write_reports(incident: IncidentRecord) -> None:
+    artifact_dir = Path("artifacts/latest")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    summary = (
+        "# Executive Summary\n\n"
+        f"Incident `{incident.incident_id}` for checkout-service recovered through an approved rollback.\n\n"
+        f"* State: {incident.state.value}\n"
+        f"* Diagnosis: {incident.final_diagnosis or 'Deployment regression in checkout-r43'}\n"
+        f"* Resolution: {incident.final_resolution or 'Rollback verified by business metrics'}\n"
+    )
+    review = (
+        "# Post-Incident Review\n\n"
+        "## Customer Impact\n\nCheckout errors and latency increased after deployment checkout-r43.\n\n"
+        "## Root Cause\n\nA deployment regression caused elevated payment timeouts and checkout latency.\n\n"
+        "## Recovery\n\n"
+        "The approved rollback restored checkout-r42 and verification confirmed healthy business metrics.\n\n"
+        "## Follow-Up Actions\n\n"
+        "* Add a canary gate for checkout deployments.\n"
+        "* Keep rollback approval paths tested during game days.\n"
+    )
+    (artifact_dir / "executive-summary.md").write_text(summary, encoding="utf-8")
+    (artifact_dir / "post-incident-review.md").write_text(review, encoding="utf-8")
+
+
+@app.post("/scenario/checkout-deployment-failure")
+async def run_checkout_deployment_failure() -> dict[str, object]:
+    client = CheckoutServiceClient()
+    await client.rollback("checkout-r42")
+    await client.inject_deployment_failure()
+    incident = normalize(
+        {
+            "source": "checkout-scenario",
+            "severity": "sev2",
+            "service": "checkout-service",
+            "resource": "checkout-service",
+            "symptom": "checkout deployment regression causing elevated errors and latency",
+            "raw_payload_ref": "scenario://checkout-deployment-regression",
+        }
+    )
+    incident = await repository.upsert(incident)
+    await audit_store.append("scenario_failure_injected", {"incident_id": incident.incident_id})
+
+    routed = await execute_route(
+        incident,
+        TriageAgent().run,
+        EvidenceAgent().run,
+        ChangeCorrelationAgent().run,
+        RCAAgent().run,
+        _write_checkpoint,
+    )
+    graph = await RemediationPlannerAgent().run(routed)
+    routed.pending_action_graph = graph
+    routed.pending_approval_action_id = graph.actions[0].action_id if graph.actions else None
+    routed.pending_plan_step_id = graph.plan_steps[0].step_id if graph.plan_steps else None
+    routed.state = IncidentState.WAITING_APPROVAL
+    routed.final_diagnosis = "Deployment checkout-r43 introduced elevated checkout errors and latency."
+    routed = await repository.upsert(routed)
+
+    if not graph.actions:
+        raise HTTPException(status_code=500, detail="scenario planner returned no action")
+    action = graph.actions[0].model_copy(update={"dry_run": False})
+    approval = ApprovalRecord(
+        approval_id=f"apr_{uuid4().hex[:10]}",
+        action_id=action.action_id,
+        plan_step_id=routed.pending_plan_step_id,
+        approval_scope="action",
+        expected_incident_version_at_grant=routed.version,
+        approver="demo-approver",
+        approved=True,
+        approval_token=f"token_{uuid4().hex}",
+        expires_at=datetime.utcnow() + timedelta(minutes=15),
+        reason="Deterministic scenario approval for local checkout rollback.",
+    )
+    routed.approvals.append(approval)
+    routed.state = IncidentState.PLANNED
+    routed = await repository.upsert(routed)
+    await audit_store.append(
+        "approval_recorded", {"incident_id": routed.incident_id, "approval_id": approval.approval_id}
+    )
+
+    routed.state = IncidentState.EXECUTING
+    routed.execution_trace.entries.append(ExecutionTraceEntry(phase="act", action_id=action.action_id))
+    result = await ExecutionAgent().run(action)
+    verified, metrics = await client.verify_recovery()
+    routed.executed_actions.append(result)
+    routed.execution_trace.entries.append(
+        ExecutionTraceEntry(phase="verify", action_id=action.action_id, success=verified, message="checkout_metrics")
+    )
+    routed.final_resolution = "Rollback to checkout-r42 restored checkout health and business KPIs."
+    routed.state = IncidentState.RESOLVED if result.success and verified else IncidentState.INVESTIGATING
+    routed = await repository.upsert(routed)
+    await audit_store.append(
+        "scenario_completed",
+        {"incident_id": routed.incident_id, "success": result.success and verified, "metrics": metrics},
+    )
+    _write_reports(routed)
+    return {
+        "incident": routed.model_dump(mode="json"),
+        "approval": approval.model_dump(mode="json"),
+        "metrics": metrics,
+    }
+
+
+@app.post("/route-async/{incident_id}")
+async def enqueue_route(incident_id: str) -> dict[str, str]:
+    settings = get_app_settings()
+    incident = await repository.get(incident_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="incident not found")
+    client = redis.from_url(settings.redis_url, decode_responses=True)
+    await client.rpush("incident-routing-jobs", f'{{"incident_id":"{incident_id}"}}')
+    await client.aclose()
+    await audit_store.append("worker_job_enqueued", {"incident_id": incident_id})
+    return {"incident_id": incident_id, "status": "queued"}

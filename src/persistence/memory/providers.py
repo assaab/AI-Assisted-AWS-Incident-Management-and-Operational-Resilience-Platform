@@ -92,3 +92,13 @@ class RedisHotStateProvider:
                 del self._fallback[key]
                 return True
             return False
+
+    async def renew_lock(self, key: str, token: str, expire_seconds: int = 30) -> bool:
+        try:
+            current = await self._client.get(key)
+            if current == token:
+                await self._client.expire(key, expire_seconds)
+                return True
+            return False
+        except Exception:
+            return self._fallback.get(key) == token

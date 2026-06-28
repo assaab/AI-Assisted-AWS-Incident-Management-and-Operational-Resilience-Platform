@@ -4,9 +4,6 @@ from uuid import uuid4
 
 import httpx
 
-from src.agents.evidence.prompts import EVIDENCE_SYSTEM
-from src.agents.evidence.schemas import EvidenceLLMOutput
-from src.agents.triage.evidence_intents import extract_triage_dict, normalize_evidence_intents
 from src.agent_runtime.llm import StructuredLLMError, get_llm_client
 from src.agent_runtime.settings import get_agent_runtime_settings
 from src.agent_runtime.tools import (
@@ -16,6 +13,9 @@ from src.agent_runtime.tools import (
     tool_recent_deployments,
 )
 from src.agent_runtime.tracing import agent_span
+from src.agents.evidence.prompts import EVIDENCE_SYSTEM
+from src.agents.evidence.schemas import EvidenceLLMOutput
+from src.agents.triage.evidence_intents import extract_triage_dict, normalize_evidence_intents
 from src.domain.contracts.models import ActionType, EvidenceEntry, IncidentRecord
 from src.observability.logging import get_logger
 

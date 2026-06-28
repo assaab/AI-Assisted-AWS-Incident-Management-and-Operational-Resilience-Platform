@@ -3,6 +3,9 @@ from __future__ import annotations
 import os
 from typing import Awaitable, Callable
 
+from apps.api.routers.audit.store import audit_store
+from apps.api.routers.incident_store.repository import repository
+from apps.api.routers.router.hybrid_router import compute_router_decision, merge_router_allowed_with_plan
 from src.agent_runtime.budgets import llm_budget_context
 from src.domain.contracts.models import (
     DecisionRecord,
@@ -13,11 +16,8 @@ from src.domain.contracts.models import (
     IncidentState,
     RouterDecision,
 )
-from src.persistence.memory.working_memory import index_incident_snippet
 from src.observability.logging import get_logger
-from apps.api.routers.audit.store import audit_store
-from apps.api.routers.incident_store.repository import repository
-from apps.api.routers.router.hybrid_router import compute_router_decision, merge_router_allowed_with_plan
+from src.persistence.memory.working_memory import index_incident_snippet
 from src.workflows.response_plans import match_response_plan
 
 _logger = get_logger("router-workflow")

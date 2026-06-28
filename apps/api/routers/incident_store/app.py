@@ -6,9 +6,9 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from apps.api.routers.incident_store.repository import repository
 from src.domain.contracts.models import IncidentRecord
 from src.observability import instrument_fastapi, set_request_id
-from apps.api.routers.incident_store.repository import repository
 
 app = FastAPI(title="incident-store")
 allowed_origins = [

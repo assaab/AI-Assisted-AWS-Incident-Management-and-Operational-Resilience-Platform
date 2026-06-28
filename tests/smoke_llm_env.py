@@ -1,4 +1,5 @@
 """Optional live LLM smoke (no secrets printed). Run from repo root: python scripts/smoke_llm_env.py"""
+
 from __future__ import annotations
 
 import asyncio

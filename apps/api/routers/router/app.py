@@ -11,14 +11,18 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from apps.api.routers.audit.store import audit_store
+from apps.api.routers.incident_store.repository import repository
+from eval.scoring.scorecard import compute_score
+from src.adapters.local.checkout_client import CheckoutServiceClient
+from src.agent_runtime.budgets import llm_budget_context
 from src.agents.change_correlation.agent import ChangeCorrelationAgent
 from src.agents.evidence.agent import EvidenceAgent
 from src.agents.executor.agent import ExecutionAgent
 from src.agents.planner.agent import RemediationPlannerAgent
 from src.agents.rca.agent import RCAAgent
 from src.agents.triage.agent import TriageAgent
-from eval.scoring.scorecard import compute_score
-from src.agent_runtime.budgets import llm_budget_context
+from src.config import get_app_settings
 from src.domain.contracts.models import (
     ActionRequest,
     ExecutionTraceEntry,
@@ -26,13 +30,11 @@ from src.domain.contracts.models import (
     IncidentState,
     PolicyClass,
 )
-from src.persistence.memory import RedisHotStateProvider
-from src.observability import get_logger, instrument_fastapi, set_request_id
 from src.domain.policies.engine import PolicyEngine
-from apps.api.routers.audit.store import audit_store
-from apps.api.routers.incident_store.repository import repository
-from src.workflows.response_plans import match_response_plan
+from src.observability import get_logger, instrument_fastapi, set_request_id
+from src.persistence.memory import RedisHotStateProvider
 from src.workflows.incident_workflow import execute_route
+from src.workflows.response_plans import match_response_plan
 
 app = FastAPI(title="router")
 allowed_origins = [
@@ -72,6 +74,7 @@ class ExecutePayload(BaseModel):
     action: ActionRequest
     autonomous: bool = False
     approval_id: Optional[str] = None
+    approval_token: Optional[str] = None
     expected_incident_version: Optional[int] = None
 
 
@@ -87,11 +90,22 @@ def _replay_dataset_path() -> Path:
 
 
 def _effective_execute_dry_run(action: ActionRequest, autonomous: bool) -> bool:
-    if os.getenv("EXECUTE_ACTION_DRY_RUN", "false").lower() == "true":
+    if get_app_settings().execution_mode == "aws" and os.getenv("EXECUTE_ACTION_DRY_RUN", "true").lower() == "true":
         return True
     if autonomous and not AUTONOMY_KILL_SWITCH:
         return False
     return action.dry_run
+
+
+async def _verify_action_recovery(action: ActionRequest) -> tuple[bool, str, dict[str, object]]:
+    if action.dry_run:
+        return True, "dry_run_verify_no_state_change", {"dry_run": True}
+    if get_app_settings().execution_mode == "local" and action.target in {"checkout-service", "checkout/api"}:
+        recovered, metrics = await CheckoutServiceClient().verify_recovery()
+        if recovered:
+            return True, "checkout recovery verified from business metrics", metrics
+        return False, "checkout recovery verification failed", metrics
+    return False, "no verification adapter configured for executed action", {}
 
 
 @app.get("/healthz")
@@ -219,8 +233,14 @@ async def execute_action(incident_id: str, payload: ExecutePayload, request: Req
         approval_record = next((item for item in incident.approvals if item.approval_id == payload.approval_id), None)
         if approval_record is None or not approval_record.approved:
             raise HTTPException(status_code=412, detail="approval record missing or denied")
+        if payload.approval_token is None or payload.approval_token != approval_record.approval_token:
+            raise HTTPException(status_code=412, detail="approval token is missing or invalid")
         if approval_record.expires_at < datetime.utcnow():
             raise HTTPException(status_code=412, detail="approval has expired")
+        if approval_record.expected_incident_version_at_grant is None:
+            raise HTTPException(status_code=412, detail="approval version is missing")
+        if incident.version > approval_record.expected_incident_version_at_grant + 1:
+            raise HTTPException(status_code=409, detail="approval was granted for a stale incident version")
         if approval_record.action_id and approval_record.action_id != payload.action.action_id:
             raise HTTPException(status_code=412, detail="approval does not match action")
         if approval_record.plan_step_id and incident.pending_plan_step_id:
@@ -246,16 +266,33 @@ async def execute_action(incident_id: str, payload: ExecutePayload, request: Req
         )
     )
     if os.getenv("EXECUTE_POST_VERIFY_ENABLED", "true").lower() == "true":
+        verified, verify_message, verify_details = await _verify_action_recovery(run_action)
         incident.execution_trace.entries.append(
             ExecutionTraceEntry(
                 phase="verify",
                 action_id=run_action.action_id,
-                success=result.success,
-                message="post_verify_stub",
+                success=verified,
+                message=verify_message,
             )
         )
+        await audit_store.append(
+            "post_action_verification",
+            {
+                "incident_id": incident_id,
+                "action_id": run_action.action_id,
+                "success": verified,
+                "message": verify_message,
+                "details": verify_details,
+            },
+        )
+    else:
+        verified = result.success
 
-    incident.state = IncidentState.RESOLVED if result.success else IncidentState.INVESTIGATING
+    incident.state = IncidentState.RESOLVED if result.success and verified else IncidentState.INVESTIGATING
+    if result.success and verified and not run_action.dry_run:
+        incident.final_resolution = "Checkout service recovered after approved rollback and verification."
+    elif result.success and run_action.dry_run:
+        incident.final_resolution = "Dry-run completed; incident remains open until a verified execution runs."
     await repository.upsert(incident)
     await audit_store.append(
         "action_executed",

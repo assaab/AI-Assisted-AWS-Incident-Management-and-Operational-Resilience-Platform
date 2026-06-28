@@ -4,10 +4,11 @@ import os
 from typing import Optional
 
 import httpx
+from pydantic import BaseModel, Field
 
-from src.agents.triage.evidence_intents import extract_triage_dict, normalize_evidence_intents
 from src.agent_runtime.llm import StructuredLLMError, get_llm_client
 from src.agent_runtime.settings import get_agent_runtime_settings
+from src.agents.triage.evidence_intents import extract_triage_dict, normalize_evidence_intents
 from src.domain.contracts.models import (
     ActionType,
     IncidentRecord,
@@ -16,8 +17,6 @@ from src.domain.contracts.models import (
     ToolPlan,
     ToolPlanItem,
 )
-from pydantic import BaseModel, Field
-
 from src.workflows.response_plans import match_response_plan
 
 
@@ -72,7 +71,9 @@ def _deterministic_next_step(
             stop_reason = "baseline_complete"
 
     conf = 0.92 if next_workflow != "stop" else 0.75
-    intents = normalize_evidence_intents(triage.get("next_required_evidence") if isinstance(triage.get("next_required_evidence"), list) else None)
+    intents = normalize_evidence_intents(
+        triage.get("next_required_evidence") if isinstance(triage.get("next_required_evidence"), list) else None
+    )
     tool_items = _tool_plan_from_intents(incident, intents)
 
     return RouterDecision(
@@ -153,13 +154,15 @@ async def compute_router_decision(incident: IncidentRecord, plan: Optional[Respo
             response_model=RouterLLMOutput,
             agent_name="router",
         )
-        merged = decision.model_copy(update={
-            "next_workflow": out.next_workflow if out.next_workflow else decision.next_workflow,
-            "investigate_only": out.investigate_only,
-            "decision_confidence": out.decision_confidence,
-            "stop_reason": out.stop_reason or decision.stop_reason,
-            "rule_ids_applied": list(decision.rule_ids_applied) + ["llm_router"],
-        })
+        merged = decision.model_copy(
+            update={
+                "next_workflow": out.next_workflow if out.next_workflow else decision.next_workflow,
+                "investigate_only": out.investigate_only,
+                "decision_confidence": out.decision_confidence,
+                "stop_reason": out.stop_reason or decision.stop_reason,
+                "rule_ids_applied": list(decision.rule_ids_applied) + ["llm_router"],
+            }
+        )
         return merged
     except (StructuredLLMError, OSError, httpx.HTTPError, httpx.RequestError):
         return decision

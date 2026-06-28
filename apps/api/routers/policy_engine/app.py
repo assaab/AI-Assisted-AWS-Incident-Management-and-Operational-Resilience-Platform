@@ -5,10 +5,10 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
-from src.domain.contracts.models import ActionRequest
-from src.observability import instrument_fastapi, set_request_id
-from src.domain.policies.engine import PolicyEngine
 from apps.api.routers.incident_store.repository import repository
+from src.domain.contracts.models import ActionRequest
+from src.domain.policies.engine import PolicyEngine
+from src.observability import instrument_fastapi, set_request_id
 
 app = FastAPI(title="policy-engine")
 instrument_fastapi(app)

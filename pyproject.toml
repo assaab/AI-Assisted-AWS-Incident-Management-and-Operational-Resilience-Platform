@@ -33,6 +33,8 @@ dev = [
   "ruff>=0.12.0",
   "mypy>=1.17.0",
   "psycopg2-binary>=2.9.0",
+  "pip-audit>=2.9.0",
+  "bandit>=1.8.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -45,7 +47,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "ASYNC"]
-ignore = ["UP007", "UP045"]
+ignore = ["UP006", "UP007", "UP035", "UP042", "UP045"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

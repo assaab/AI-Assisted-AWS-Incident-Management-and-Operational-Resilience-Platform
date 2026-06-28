@@ -40,6 +40,12 @@ function resolveApprovalIdForAction(inc: IncidentRecord, actionId: string): stri
   return rec?.approval_id ?? null;
 }
 
+function resolveApprovalTokenForAction(inc: IncidentRecord, actionId: string): string | null {
+  const chain = [...(inc.approvals ?? [])].reverse();
+  const rec = chain.find((a) => a.approved && a.action_id === actionId);
+  return rec?.approval_token ?? null;
+}
+
 type Props = {
   incidents: IncidentRecord[];
   auditEvents: AuditEvent[];
@@ -714,8 +720,10 @@ export function IncidentWorkspace(props: Props): JSX.Element {
                                     return;
                                   }
                                   const approvalId = resolveApprovalIdForAction(latest, actNow.action_id);
+                                  const approvalToken = resolveApprovalTokenForAction(latest, actNow.action_id);
                                   const result = await executeIncidentAction(latest.incident_id, actNow, {
                                     approvalId,
+                                    approvalToken,
                                     expectedVersion: latest.version,
                                     dryRun: executeDryRun
                                   });

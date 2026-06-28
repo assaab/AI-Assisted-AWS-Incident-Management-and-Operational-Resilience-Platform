@@ -5,6 +5,21 @@ from src.domain.contracts.models import ActionType, PolicyClass, ResponsePlan
 
 def match_response_plan(severity: str, symptom: str) -> ResponsePlan:
     symptom_lower = symptom.lower()
+    if "checkout" in symptom_lower and ("deployment" in symptom_lower or "error" in symptom_lower):
+        return ResponsePlan(
+            plan_id="checkout-deployment-regression-v1",
+            workflow_family="checkout-resilience",
+            policy_class=PolicyClass.REVIEW_REQUIRED,
+            allowed_actions=[
+                ActionType.QUERY_METRICS,
+                ActionType.QUERY_LOGS,
+                ActionType.GET_RECENT_DEPLOYMENTS,
+                ActionType.GET_TOPOLOGY,
+                ActionType.ROLLBACK_DEPLOYMENT,
+            ],
+            denied_actions=[ActionType.RUN_SHELL, ActionType.DRAIN_NODE],
+            max_retries=1,
+        )
     if severity in {"sev1", "sev2"} and ("cpu" in symptom_lower or "error" in symptom_lower):
         return ResponsePlan(
             plan_id="compute-performance-v1",

@@ -9,20 +9,15 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from src.domain.contracts.models import ApprovalRecord, IncidentState
-from src.observability import instrument_fastapi, set_request_id
 from apps.api.routers.audit.store import audit_store
 from apps.api.routers.incident_store.repository import repository
+from src.domain.contracts.models import ApprovalRecord, IncidentState
+from src.observability import instrument_fastapi, set_request_id
 
 app = FastAPI(title="approval-api")
-_default_cors = (
-    "http://localhost:5173,http://localhost:5175,"
-    "http://127.0.0.1:5173,http://127.0.0.1:5175"
-)
+_default_cors = "http://localhost:5173,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5175"
 allowed_origins = [
-    origin.strip()
-    for origin in os.getenv("CORS_ALLOW_ORIGINS", _default_cors).split(",")
-    if origin.strip()
+    origin.strip() for origin in os.getenv("CORS_ALLOW_ORIGINS", _default_cors).split(",") if origin.strip()
 ]
 app.add_middleware(
     CORSMiddleware,

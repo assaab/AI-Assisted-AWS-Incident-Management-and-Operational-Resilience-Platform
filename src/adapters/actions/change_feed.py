@@ -12,6 +12,11 @@ class ChangeFeedProtocol(Protocol):
 
 class StubChangeFeedClient:
     async def get_recent_deployments(self, service: str) -> str:
+        if service == "checkout-service":
+            return (
+                "Deployment checkout-r43 applied to checkout-service 12 minutes before alert; "
+                "previous stable revision checkout-r42"
+            )
         return f"Deployment v2026.03.19 applied to {service} 12 minutes before alert"
 
 

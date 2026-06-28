@@ -44,8 +44,7 @@ class LLMClient(Protocol):
         user: str,
         response_model: type[T],
         agent_name: str,
-    ) -> T:
-        ...
+    ) -> T: ...
 
 
 class OpenAICompatibleClient:
@@ -103,9 +102,7 @@ class OpenAICompatibleClient:
         try:
             data = json.loads(raw_text)
         except json.JSONDecodeError as exc:
-            raise StructuredLLMError(
-                f"LLM returned non-JSON: {redact_for_logging(raw_text[:500])}"
-            ) from exc
+            raise StructuredLLMError(f"LLM returned non-JSON: {redact_for_logging(raw_text[:500])}") from exc
 
         try:
             return response_model.model_validate(data)

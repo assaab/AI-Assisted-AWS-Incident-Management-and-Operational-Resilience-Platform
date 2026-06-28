@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import List, Optional
 
 
 def normalize_evidence_intents(raw: Optional[List[str]]) -> List[str]:

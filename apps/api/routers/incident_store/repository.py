@@ -7,6 +7,7 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from src.config import get_app_settings
 from src.domain.contracts.models import IncidentRecord
 from src.observability.logging import get_logger
 
@@ -39,6 +40,8 @@ class IncidentRepository:
             try:
                 self._engine = create_async_engine(self._dsn, pool_pre_ping=True)
             except Exception:
+                if not get_app_settings().demo_mode:
+                    raise
                 self._fallback_mode = True
                 self._schema_ready = True
                 self._logger.warning("incident_repository_fallback_mode_enabled")
@@ -78,6 +81,8 @@ class IncidentRepository:
                 )
             self._schema_ready = True
         except Exception:
+            if not get_app_settings().demo_mode:
+                raise
             self._fallback_mode = True
             self._schema_ready = True
             self._logger.warning("incident_repository_fallback_mode_enabled")
@@ -154,11 +159,15 @@ class IncidentRepository:
         assert engine is not None
         async with engine.connect() as connection:
             row = (
-                await connection.execute(
-                    text("SELECT payload FROM incidents WHERE incident_id = :incident_id"),
-                    {"incident_id": incident_id},
+                (
+                    await connection.execute(
+                        text("SELECT payload FROM incidents WHERE incident_id = :incident_id"),
+                        {"incident_id": incident_id},
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
         if row is None:
             return None
         return IncidentRecord.model_validate(row["payload"])
@@ -172,18 +181,22 @@ class IncidentRepository:
         assert engine is not None
         async with engine.connect() as connection:
             db_rows = (
-                await connection.execute(
-                    text(
-                        """
+                (
+                    await connection.execute(
+                        text(
+                            """
                         SELECT payload
                         FROM incidents
                         ORDER BY updated_at DESC
                         LIMIT :limit;
                         """
-                    ),
-                    {"limit": limit},
+                        ),
+                        {"limit": limit},
+                    )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
         return [IncidentRecord.model_validate(row["payload"]) for row in db_rows]
 
     async def get_by_dedupe_key(self, dedupe_key: str) -> IncidentRecord | None:
@@ -197,19 +210,23 @@ class IncidentRepository:
         assert engine is not None
         async with engine.connect() as connection:
             row = (
-                await connection.execute(
-                    text(
-                        """
+                (
+                    await connection.execute(
+                        text(
+                            """
                         SELECT payload
                         FROM incidents
                         WHERE dedupe_key = :dedupe_key
                         ORDER BY updated_at DESC
                         LIMIT 1;
                         """
-                    ),
-                    {"dedupe_key": dedupe_key},
+                        ),
+                        {"dedupe_key": dedupe_key},
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
         if row is None:
             return None
         return IncidentRecord.model_validate(row["payload"])

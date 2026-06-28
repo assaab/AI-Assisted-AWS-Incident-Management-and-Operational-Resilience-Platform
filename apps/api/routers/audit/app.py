@@ -7,8 +7,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from src.observability import instrument_fastapi, set_request_id
 from apps.api.routers.audit.store import audit_store
+from src.observability import instrument_fastapi, set_request_id
 
 app = FastAPI(title="audit")
 allowed_origins = [

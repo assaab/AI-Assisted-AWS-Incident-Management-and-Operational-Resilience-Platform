@@ -8,6 +8,7 @@ from typing import Any, Optional
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from src.config import get_app_settings
 from src.observability.logging import get_logger
 
 
@@ -30,6 +31,8 @@ class AuditStore:
             try:
                 self._engine = create_async_engine(self._dsn, pool_pre_ping=True)
             except Exception:
+                if not get_app_settings().demo_mode:
+                    raise
                 self._fallback_mode = True
                 self._schema_ready = True
                 self._logger.warning("audit_store_fallback_mode_enabled")
@@ -59,6 +62,8 @@ class AuditStore:
                 )
             self._schema_ready = True
         except Exception:
+            if not get_app_settings().demo_mode:
+                raise
             self._fallback_mode = True
             self._schema_ready = True
             self._logger.warning("audit_store_fallback_mode_enabled")
@@ -98,18 +103,22 @@ class AuditStore:
         assert self._engine is not None
         async with self._engine.connect() as connection:
             rows = (
-                await connection.execute(
-                    text(
-                        """
+                (
+                    await connection.execute(
+                        text(
+                            """
                         SELECT event_type, payload, created_at
                         FROM audit_events
                         ORDER BY created_at DESC
                         LIMIT :limit;
                         """
-                    ),
-                    {"limit": limit},
+                        ),
+                        {"limit": limit},
+                    )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
         return [
             {
                 "event_type": row["event_type"],

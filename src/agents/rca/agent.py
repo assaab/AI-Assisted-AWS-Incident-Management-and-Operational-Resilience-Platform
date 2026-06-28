@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import httpx
 
-from src.agents.rca.prompts import RCA_SYSTEM
-from src.agents.rca.schemas import RCALLMOutput
 from src.agent_runtime.llm import StructuredLLMError, get_llm_client
 from src.agent_runtime.settings import get_agent_runtime_settings
 from src.agent_runtime.tracing import agent_span
+from src.agents.rca.prompts import RCA_SYSTEM
+from src.agents.rca.schemas import RCALLMOutput
 from src.domain.contracts.models import IncidentRecord
 from src.observability.logging import get_logger
 
@@ -42,6 +42,16 @@ class RCAAgent:
 
     def _stub_run(self, incident: IncidentRecord) -> list[dict[str, object]]:
         hypotheses: list[dict[str, object]] = []
+        if incident.metadata.service == "checkout-service" and any(
+            "checkout-r43" in ev.summary or "deployment" in ev.summary.lower() for ev in incident.evidence
+        ):
+            hypotheses.append(
+                {
+                    "hypothesis": "Checkout deployment revision checkout-r43 introduced elevated latency and errors",
+                    "confidence": 0.86,
+                    "supporting_evidence_ids": [ev.evidence_id for ev in incident.evidence],
+                }
+            )
         if any("cpu" in ev.summary.lower() for ev in incident.evidence):
             hypotheses.append(
                 {

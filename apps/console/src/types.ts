@@ -89,6 +89,9 @@ export type ApprovalRecord = {
   plan_step_id?: string | null;
   approver: string;
   approved: boolean;
+  approval_token?: string;
+  expires_at?: string;
+  expected_incident_version_at_grant?: number | null;
   created_at: string;
   reason?: string | null;
 };

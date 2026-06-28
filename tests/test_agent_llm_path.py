@@ -1,4 +1,5 @@
 """Verify agents invoke the LLM client when AGENTIC_ENABLED=true (no network)."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -6,10 +7,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.agents.triage.agent import TriageAgent
-from src.agents.triage.schemas import TriageLLMOutput
 from src.agent_runtime.llm import clear_llm_client_cache
 from src.agent_runtime.settings import clear_agent_runtime_settings_cache
+from src.agents.triage.agent import TriageAgent
+from src.agents.triage.schemas import TriageLLMOutput
 from src.domain.contracts.models import IncidentEnvelope, IncidentRecord
 
 

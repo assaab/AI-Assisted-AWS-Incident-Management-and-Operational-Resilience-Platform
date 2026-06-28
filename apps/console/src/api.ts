@@ -18,14 +18,19 @@ function baseFromEnvOrDevProxy(envUrl: string | undefined, devProxyPath: string,
 const incidentStoreBase = baseFromEnvOrDevProxy(
   import.meta.env.VITE_INCIDENT_STORE_URL,
   "/api/incidents-store",
-  "http://localhost:8002"
+  "http://localhost:8080"
 );
-const auditBase = baseFromEnvOrDevProxy(import.meta.env.VITE_AUDIT_URL, "/api/audit", "http://localhost:8006");
-const routerBase = baseFromEnvOrDevProxy(import.meta.env.VITE_ROUTER_URL, "/api/router", "http://localhost:8003");
+const auditBase = baseFromEnvOrDevProxy(import.meta.env.VITE_AUDIT_URL, "/api/audit", "http://localhost:8080");
+const routerBase = baseFromEnvOrDevProxy(import.meta.env.VITE_ROUTER_URL, "/api/router", "http://localhost:8080");
 const approvalBase = baseFromEnvOrDevProxy(
   import.meta.env.VITE_APPROVAL_URL,
   "/api/approval",
-  "http://localhost:8005"
+  "http://localhost:8080"
+);
+const scenarioBase = baseFromEnvOrDevProxy(
+  import.meta.env.VITE_SCENARIO_URL,
+  "/api/scenario",
+  "http://localhost:8080"
 );
 
 const jsonHeaders = { "Content-Type": "application/json" };
@@ -50,7 +55,7 @@ export async function loadDashboard(): Promise<DashboardLoad> {
       incidents = (await r.json()) as IncidentRecord[];
     }
   } catch {
-    loadErrors.push("Incident store unreachable (check port 8002)");
+    loadErrors.push("Incident store unreachable (check port 8080)");
   }
 
   let auditEvents: AuditEvent[] = [];
@@ -62,7 +67,7 @@ export async function loadDashboard(): Promise<DashboardLoad> {
       auditEvents = (await r.json()) as AuditEvent[];
     }
   } catch {
-    loadErrors.push("Audit API unreachable (check port 8006)");
+    loadErrors.push("Audit API unreachable (check port 8080)");
   }
 
   let score: ReplayScore | null = null;
@@ -75,7 +80,7 @@ export async function loadDashboard(): Promise<DashboardLoad> {
       score = (await r.json()) as ReplayScore;
     }
   } catch {
-    loadErrors.push("Router unreachable (check port 8003)");
+    loadErrors.push("Router unreachable (check port 8080)");
     score = emptyScore;
   }
 
@@ -123,7 +128,10 @@ export type ApprovalSubmit = {
   expectedIncidentVersion: number;
 };
 
-export async function submitApproval(incidentId: string, body: ApprovalSubmit): Promise<{ approval_id: string }> {
+export async function submitApproval(
+  incidentId: string,
+  body: ApprovalSubmit
+): Promise<{ approval_id: string; approval_token: string }> {
   const url = `${approvalBase}/incidents/${encodeURIComponent(incidentId)}/approvals`;
   let r: Response;
   try {
@@ -141,7 +149,7 @@ export async function submitApproval(incidentId: string, body: ApprovalSubmit): 
     });
   } catch (e) {
     const hint =
-      "Cannot reach the approval API. Start it on port 8005, or set VITE_APPROVAL_URL in apps/console/.env. " +
+      "Cannot reach the approval API. Start it on port 8080, or set VITE_APPROVAL_URL in apps/console/.env. " +
       "If the UI and API use different hostnames (localhost vs 127.0.0.1), use `npm run dev` proxies or " +
       "add your page origin to the API CORS_ALLOW_ORIGINS.";
     if (e instanceof TypeError) {
@@ -153,18 +161,19 @@ export async function submitApproval(incidentId: string, body: ApprovalSubmit): 
     const detail = await r.text();
     throw new Error(`Approval failed (${r.status}): ${detail}`);
   }
-  const data = (await r.json()) as { approval?: { approval_id?: string } };
+  const data = (await r.json()) as { approval?: { approval_id?: string; approval_token?: string } };
   const id = data.approval?.approval_id;
-  if (!id) {
-    throw new Error("Approval response missing approval_id");
+  const token = data.approval?.approval_token;
+  if (!id || !token) {
+    throw new Error("Approval response missing approval_id or approval_token");
   }
-  return { approval_id: id };
+  return { approval_id: id, approval_token: token };
 }
 
 export async function executeIncidentAction(
   incidentId: string,
   action: ActionRequest,
-  opts: { approvalId?: string | null; expectedVersion: number; dryRun: boolean }
+  opts: { approvalId?: string | null; approvalToken?: string | null; expectedVersion: number; dryRun: boolean }
 ): Promise<ExecuteResponse> {
   const payload = {
     action: {
@@ -174,6 +183,7 @@ export async function executeIncidentAction(
     },
     autonomous: false,
     approval_id: opts.approvalId ?? undefined,
+    approval_token: opts.approvalToken ?? undefined,
     expected_incident_version: opts.expectedVersion
   };
   const r = await fetch(`${routerBase}/execute/${encodeURIComponent(incidentId)}`, {
@@ -186,4 +196,17 @@ export async function executeIncidentAction(
     throw new Error(`Execute failed (${r.status}): ${detail}`);
   }
   return (await r.json()) as ExecuteResponse;
+}
+
+export async function runCheckoutDeploymentFailureScenario(): Promise<IncidentRecord> {
+  const r = await fetch(`${scenarioBase}/scenario/checkout-deployment-failure`, {
+    method: "POST",
+    headers: jsonHeaders
+  });
+  if (!r.ok) {
+    const detail = await r.text();
+    throw new Error(`Scenario failed (${r.status}): ${detail}`);
+  }
+  const data = (await r.json()) as { incident: IncidentRecord };
+  return data.incident;
 }
